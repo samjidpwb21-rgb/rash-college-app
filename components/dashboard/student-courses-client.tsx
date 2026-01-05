@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+
 // ============================================================================
 // CAMPUSTRACK - STUDENT COURSES CLIENT COMPONENT
 // ============================================================================
@@ -30,8 +32,9 @@ interface StudentCoursesClientProps {
 }
 
 export function StudentCoursesClient({ user, currentSemester, courses }: StudentCoursesClientProps) {
-    const headerUser = {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+
+    const headerUser = {
         name: user.name,
         email: "",
         role: `${user.departmentName} • Semester ${user.semesterNumber}`,

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start"
@@ -64,6 +65,7 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "uuid": "^11.0.3",
     "vaul": "latest",
     "zod": "3.25.76"
   },

@@ -2,7 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
-import { GlobalLoader } from "@/components/ui/global-loader"
+import { Suspense } from "react"
+import GlobalLoaderWrapper from "@/components/ui/global-loader-wrapper"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import "./globals.css"
 
@@ -30,7 +31,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <GlobalLoader />
+          <Suspense fallback={null}>
+            <GlobalLoaderWrapper />
+          </Suspense>
           {children}
           <Analytics />
         </ThemeProvider>

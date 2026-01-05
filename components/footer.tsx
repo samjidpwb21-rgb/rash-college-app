@@ -33,6 +33,7 @@ export function Footer() {
             <p>&copy; {new Date().getFullYear()} R.A.S.H College App. All rights reserved.</p>
           </div>
         </div>
+      </div>
     </footer>
   )
 }

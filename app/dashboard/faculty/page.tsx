@@ -3,11 +3,12 @@
 // ============================================================================
 // Fetches real data from database and passes to client component
 
+import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth-options"
 import { getFacultyDashboardData } from "@/actions/dashboard"
-import { FacultyDashboardClient } from "@/components/dashboard/faculty-dashboard-client"
+import FacultyWrapper from "./wrapper"
 
 export default async function FacultyDashboard() {
   // 1. Check authentication
@@ -32,6 +33,7 @@ export default async function FacultyDashboard() {
         email: session.user.email || "",
         departmentName: "Unknown",
         designation: "Faculty",
+        facultyId: "unknown",
       },
       stats: {
         totalSubjects: 0,
@@ -42,9 +44,17 @@ export default async function FacultyDashboard() {
       todayClasses: [],
       subjects: [],
     }
-    return <FacultyDashboardClient data={emptyData} />
+    return (
+      <Suspense fallback={null}>
+        <FacultyWrapper data={emptyData} />
+      </Suspense>
+    )
   }
 
   // 3. Render with real data
-  return <FacultyDashboardClient data={result.data} />
+  return (
+    <Suspense fallback={null}>
+      <FacultyWrapper data={result.data} />
+    </Suspense>
+  )
 }
