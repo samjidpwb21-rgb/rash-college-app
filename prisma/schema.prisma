@@ -1,0 +1,597 @@
+// ============================================================================
+// CAMPUSTRACK - PRODUCTION DATABASE SCHEMA
+// ============================================================================
+// Version: 1.1
+// Database: PostgreSQL
+// ORM: Prisma
+// 
+// Scale: ~400 students, 30 faculty, 4 admins
+// Retention: Attendance stored forever
+// 
+// ARCHITECTURE COMPLIANCE:
+// ✓ Arts & Science College
+// ✓ 4 years / 8 semesters
+// ✓ 5 periods per day
+// ✓ Present/Absent only (no late)
+// ✓ No MDC / cross-department
+// ✓ Global notices & events
+// ✓ Soft delete for users
+//
+// v1.1 REFINEMENTS:
+// - Removed redundant academicYearId from StudentProfile (infer via semester)
+// - Added optional semesterId to AttendanceRecord for faster queries
+// - Added onDelete:Restrict to Notice/Event author (preserve content)
+// - Updated Timetable unique constraint with departmentId for future sections
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+// User roles - exactly 3 types as per architecture
+enum Role {
+  ADMIN
+  FACULTY
+  STUDENT
+}
+
+// Attendance status - binary only, no late arrivals
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+// Subject type - theory vs practical (labs)
+enum SubjectType {
+  THEORY
+  PRACTICAL
+}
+
+// Notification type - for categorization and filtering
+enum NotificationType {
+  ATTENDANCE
+  NOTICE
+  EVENT
+  SYSTEM
+}
+
+// ============================================================================
+// USER MODELS
+// ============================================================================
+
+// Base User model - authentication and role management
+// Soft delete implemented via deletedAt field
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  name         String    @db.VarChar(100)
+  avatar       String?   @db.VarChar(500) // URL to profile image
+  role         Role
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime? // Soft delete - null means active
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // One-to-one relationships (user has exactly one profile based on role)
+  studentProfile StudentProfile?
+  facultyProfile FacultyProfile?
+
+  // Relations for content authored by this user
+  notices       Notice[]
+  events        Event[]
+  notifications Notification[]
+  preferences   UserPreferences?
+
+  // Index for fast login queries
+  @@index([email, isActive])
+  @@index([role, isActive])
+  @@map("users")
+}
+
+// User preferences - settings and customization
+model UserPreferences {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @unique @db.Uuid
+  darkMode             Boolean  @default(false)
+  notificationsEnabled Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// Student profile - extends User with academic details
+// Every student belongs to one department and one semester
+// Academic year is INFERRED via semester.academicYearId (no redundancy)
+model StudentProfile {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @unique @db.Uuid
+  enrollmentNo   String    @unique @db.VarChar(20) // College enrollment number
+  phone          String?   @db.VarChar(15)
+  address        String?   @db.Text
+  dateOfBirth    DateTime? @db.Date
+  guardianName   String?   @db.VarChar(100)
+  guardianPhone  String?   @db.VarChar(15)
+  bloodGroup     String?   @db.VarChar(5) // A+, B-, O+, etc.
+  gender         String?   @db.VarChar(10) // Male, Female, Other
+  libraryBarcode String?   @unique @db.VarChar(50)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Academic placement (year inferred via semester → academicYear)
+  departmentId String @db.Uuid
+  semesterId   String @db.Uuid
+
+  // Relations
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department    Department            @relation(fields: [departmentId], references: [id])
+  semester      Semester              @relation(fields: [semesterId], references: [id])
+  attendance    AttendanceRecord[]
+  mdcAttendance MDCAttendanceRecord[] @relation("MDCAttendance") // MDC attendance records
+
+  // Indexes for dashboard queries
+  // To query by year: join semester → academicYear
+  @@index([departmentId, semesterId])
+  @@index([semesterId])
+  @@index([enrollmentNo])
+  @@map("student_profiles")
+}
+
+// Faculty profile - extends User with designation and department
+model FacultyProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  employeeId     String   @unique @db.VarChar(20) // Employee ID
+  phone          String?  @db.VarChar(15)
+  address        String?  @db.Text
+  bloodGroup     String?  @db.VarChar(5) //  A+, B-, O+, etc.
+  gender         String?  @db.VarChar(10) // Male, Female, Other
+  libraryBarcode String?  @unique @db.VarChar(50)
+  designation    String   @db.VarChar(100) // e.g., "Associate Professor"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Primary department (faculty may teach in multiple but belongs to one)
+  departmentId String @db.Uuid
+
+  // Relations
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department          Department            @relation(fields: [departmentId], references: [id])
+  subjectsAssigned    FacultySubject[] // Many-to-many with subjects
+  timetableEntries    Timetable[]
+  attendanceMarked    AttendanceRecord[] // Attendance records marked by this faculty
+  mdcCourses          MDCCourse[] // MDC courses assigned to faculty
+  mdcAttendanceMarked MDCAttendanceRecord[] @relation("MDCAttendanceMarked") // MDC attendance records
+
+  @@index([departmentId])
+  @@index([employeeId])
+  @@map("faculty_profiles")
+}
+
+// ============================================================================
+// ACADEMIC STRUCTURE
+// ============================================================================
+
+// Department - top level academic unit (e.g., "Computer Science", "Commerce")
+model Department {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100) // e.g., "Computer Science"
+  code        String   @unique @db.VarChar(10) // e.g., "CS"
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  students             StudentProfile[]
+  faculty              FacultyProfile[]
+  subjects             Subject[]
+  timetable            Timetable[] // v1.1: Added for department-based timetable
+  syllabus             Syllabus[] // v1.2: Semester-wise syllabus PDFs
+  notices              Notice[] // v1.3: Department-targeted notices
+  mdcCoursesAsHome     MDCCourse[]      @relation("MDCHomeDepartment") // MDC courses for this dept's students
+  mdcCoursesAsProvider MDCCourse[]      @relation("MDCOfferingDepartment") // MDC courses this dept offers
+
+  @@map("departments")
+}
+
+// Academic Year - 1 to 4 (fixed, rarely changes)
+// Represents "1st Year", "2nd Year", etc.
+model AcademicYear {
+  id        String   @id @default(uuid()) @db.Uuid
+  year      Int      @unique // 1, 2, 3, or 4
+  name      String   @db.VarChar(20) // "First Year", "Second Year", etc.
+  createdAt DateTime @default(now())
+
+  // Relations
+  // Note: students access year via semester.academicYear (no direct relation)
+  semesters Semester[]
+  timetable Timetable[]
+
+  @@map("academic_years")
+}
+
+// Semester - 1 to 8 (two per academic year)
+// Odd semesters (1,3,5,7) and Even semesters (2,4,6,8)
+model Semester {
+  id             String   @id @default(uuid()) @db.Uuid
+  number         Int      @unique // 1-8
+  name           String   @db.VarChar(20) // "Semester 1", "Semester 2", etc.
+  isOdd          Boolean // true for 1,3,5,7 - false for 2,4,6,8
+  academicYearId String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  // Relations
+  academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
+  students     StudentProfile[]
+  subjects     Subject[]
+  timetable    Timetable[]
+  attendance   AttendanceRecord[] // v1.1: For semester-wise attendance queries
+  syllabus     Syllabus[] // v1.2: One syllabus per semester per department
+
+  // Composite index for year+semester queries
+  @@index([academicYearId, number])
+  @@map("semesters")
+}
+
+// Syllabus - semester-wise PDF documents (one per semester per department)
+// v1.2: Added for syllabus management feature
+model Syllabus {
+  id           String   @id @default(uuid()) @db.Uuid
+  departmentId String   @db.Uuid
+  semesterId   String   @db.Uuid
+  fileName     String   @db.VarChar(255)
+  fileUrl      String   @db.VarChar(500)
+  uploadedBy   String   @db.Uuid // Admin user ID
+  uploadedAt   DateTime @default(now())
+
+  // Relations
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  semester   Semester   @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+
+  // One syllabus per semester per department
+  @@unique([departmentId, semesterId])
+  @@index([departmentId])
+  @@index([semesterId])
+  @@map("syllabus")
+}
+
+// Subject/Course - academic subject taught in a semester
+// Editable after creation as per requirements
+model Subject {
+  id          String      @id @default(uuid()) @db.Uuid
+  code        String      @unique @db.VarChar(10) // e.g., "CS101"
+  name        String      @db.VarChar(100) // e.g., "Data Structures"
+  credits     Int         @default(3)
+  type        SubjectType @default(THEORY) // THEORY or PRACTICAL
+  description String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Academic placement
+  departmentId String @db.Uuid
+  semesterId   String @db.Uuid
+
+  // Relations
+  department      Department         @relation(fields: [departmentId], references: [id])
+  semester        Semester           @relation(fields: [semesterId], references: [id])
+  facultyAssigned FacultySubject[]
+  timetable       Timetable[]
+  attendance      AttendanceRecord[]
+  colorMapping    SubjectColorMap? // v1.2: One color per subject for timetable UI
+
+  // Index for fetching subjects by department/semester
+  @@index([departmentId, semesterId])
+  @@index([code])
+  @@map("subjects")
+}
+
+// Faculty-Subject mapping - many-to-many relationship
+// A faculty can teach multiple subjects, a subject can have multiple faculty
+model FacultySubject {
+  id        String   @id @default(uuid()) @db.Uuid
+  facultyId String   @db.Uuid
+  subjectId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  // Relations
+  faculty FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  subject Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  // Unique constraint - faculty can only be assigned once per subject
+  @@unique([facultyId, subjectId])
+  @@index([facultyId])
+  @@index([subjectId])
+  @@map("faculty_subjects")
+}
+
+// SubjectColorMap - persistent color assignments for subjects in timetable UI
+// v1.2: Added for consistent subject coloring across all timetable views
+model SubjectColorMap {
+  id         String @id @default(uuid()) @db.Uuid
+  subjectId  String @unique @db.Uuid
+  colorIndex Int // Index into SUBJECT_COLORS array
+
+  // Relations
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId])
+  @@map("subject_color_map")
+}
+
+// ============================================================================
+// TIMETABLE
+// ============================================================================
+
+// Timetable - fixed schedule per semester (5 periods x 6 days)
+// Rarely changed, manual updates only
+// v1.1: Added departmentId to unique constraint for future section support
+model Timetable {
+  id        String   @id @default(uuid()) @db.Uuid
+  dayOfWeek Int // 1=Monday, 2=Tuesday, ..., 6=Saturday (no Sunday)
+  period    Int // 1 to 5 (5 periods per day)
+  room      String?  @db.VarChar(20) // e.g., "Room 101", "Lab 2"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Academic context
+  subjectId      String @db.Uuid
+  facultyId      String @db.Uuid
+  departmentId   String @db.Uuid // v1.1: Added for section-ready constraint
+  academicYearId String @db.Uuid
+  semesterId     String @db.Uuid
+
+  // Relations
+  subject      Subject        @relation(fields: [subjectId], references: [id])
+  faculty      FacultyProfile @relation(fields: [facultyId], references: [id])
+  department   Department     @relation(fields: [departmentId], references: [id]) // v1.1
+  academicYear AcademicYear   @relation(fields: [academicYearId], references: [id])
+  semester     Semester       @relation(fields: [semesterId], references: [id])
+
+  // v1.1: Unique constraint includes departmentId for future section support
+  // Currently: one class per slot per department/year/semester
+  // Future: can add sectionId to support A/B/C sections
+  @@unique([dayOfWeek, period, departmentId, academicYearId, semesterId])
+  // Index for fetching schedule by day
+  @@index([departmentId, academicYearId, semesterId, dayOfWeek])
+  @@index([facultyId, dayOfWeek])
+  @@map("timetables")
+}
+
+// ============================================================================
+// ATTENDANCE SYSTEM (CRITICAL - OPTIMIZED FOR SCALE)
+// ============================================================================
+
+// AttendanceRecord - core attendance tracking
+// 5 records per student per day (one per period)
+// Stored FOREVER - never deleted
+// Optimized for:
+//   - Fast date-based queries (student dashboards)
+//   - Safe writes (unique constraint prevents duplicates)
+//   - Long-term retention (minimal indexes for storage)
+model AttendanceRecord {
+  id        String           @id @default(uuid()) @db.Uuid
+  date      DateTime         @db.Date // Only date, no time
+  period    Int // 1 to 5
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  studentId  String  @db.Uuid
+  subjectId  String  @db.Uuid
+  semesterId String? @db.Uuid // v1.1: Optional, for faster semester-wise queries
+  markedBy   String  @db.Uuid // Faculty who marked attendance
+
+  student  StudentProfile @relation(fields: [studentId], references: [id])
+  subject  Subject        @relation(fields: [subjectId], references: [id])
+  semester Semester?      @relation(fields: [semesterId], references: [id]) // v1.1
+  faculty  FacultyProfile @relation(fields: [markedBy], references: [id])
+
+  // CRITICAL: Unique constraint prevents duplicate attendance
+  // One record per student per subject per date per period
+  @@unique([studentId, subjectId, date, period])
+  // CRITICAL: Index for student dashboard queries
+  // "Show my attendance for this month/semester"
+  @@index([studentId, date])
+  // v1.1: Index for semester-wise queries (faster than joining subject→semester)
+  @@index([studentId, semesterId, date])
+  // Index for faculty queries
+  // "Show attendance I marked today"
+  @@index([markedBy, date])
+  // Index for subject-based queries
+  // "Show attendance for CS101 on this date"
+  @@index([subjectId, date])
+  // Composite index for fastest dashboard loads
+  @@index([studentId, subjectId, date])
+  @@map("attendance_records")
+}
+
+// ============================================================================
+// COMMUNICATION
+// ============================================================================
+
+// Notice Type Classification
+enum NoticeType {
+  ACADEMIC
+  EVENT
+  EXAM
+  GENERAL
+}
+
+// Notice - global announcements with optional department targeting and images
+model Notice {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(200)
+  content     String    @db.Text
+  isImportant Boolean   @default(false) // Pin to top
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiry date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Author - v1.1: Restrict delete to preserve notices when user is soft-deleted
+  authorId String @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  // v1.3: Enhanced features (all optional for backward compatibility)
+  imageUrl     String?    @db.VarChar(500) // Optional notice image
+  departmentId String?    @db.Uuid // Optional department targeting
+  colorIndex   Int?       @default(0) // Persistent color assignment
+  type         NoticeType @default(GENERAL) // Notice classification
+
+  // v1.3: Optional department relation
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  // Index for listing notices
+  @@index([publishedAt(sort: Desc)])
+  @@index([isImportant, publishedAt(sort: Desc)])
+  @@index([departmentId]) // v1.3: For department-filtered queries
+  @@map("notices")
+}
+
+// Event - global calendar events (no department/year targeting)
+model Event {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(200)
+  description String?   @db.Text
+  eventDate   DateTime  @db.Date
+  eventTime   DateTime? @db.Time // Optional start time
+  endTime     DateTime? @db.Time // Optional end time
+  location    String?   @db.VarChar(100)
+  isAllDay    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Author - v1.1: Restrict delete to preserve events when user is soft-deleted
+  authorId String @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  // Index for calendar queries
+  @@index([eventDate])
+  @@map("events")
+}
+
+// Notification - user-specific notifications
+// Read/unread tracking for notification bell
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  message   String           @db.Text
+  link      String?          @db.VarChar(500) // Optional deep link
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Recipient
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Index for notification bell (unread first, newest first)
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ============================================================================
+// END OF SCHEMA
+// ============================================================================
+// MDC (MULTI-DISCIPLINARY COURSE) SYSTEM
+// ============================================================================
+// Additive feature - allows Admin to configure cross-department courses
+// Faculty can mark attendance for MDC classes separately from regular attendance
+
+// MDC Course configuration
+// Represents a multi-disciplinary course offered by one department to students of another
+model MDCCourse {
+  id         String @id @default(uuid()) @db.Uuid
+  courseName String @db.VarChar(200)
+
+  // Department relationships
+  homeDepartmentId String @db.Uuid // Department whose students take the MDC
+  mdcDepartmentId  String @db.Uuid // Department offering the MDC course
+
+  // Academic structure (4 years × 2 semesters = 8 combinations)
+  year     Int // 1-4
+  semester Int // 1-2
+
+  // Student list (configured by Admin)
+  studentIds String[] @db.Uuid // Array of student IDs
+
+  // Optional faculty assignment
+  facultyId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  homeDepartment    Department            @relation("MDCHomeDepartment", fields: [homeDepartmentId], references: [id])
+  mdcDepartment     Department            @relation("MDCOfferingDepartment", fields: [mdcDepartmentId], references: [id])
+  faculty           FacultyProfile?       @relation(fields: [facultyId], references: [id])
+  attendanceRecords MDCAttendanceRecord[]
+
+  // Unique constraint: One MDC course per home-dept/mdc-dept/year/semester combo
+  @@unique([homeDepartmentId, mdcDepartmentId, year, semester])
+  // Index for faculty queries
+  @@index([facultyId])
+  @@index([homeDepartmentId])
+  @@index([mdcDepartmentId])
+  @@map("mdc_courses")
+}
+
+// MDC Attendance - completely separate from regular attendance
+model MDCAttendanceRecord {
+  id        String           @id @default(uuid()) @db.Uuid
+  date      DateTime         @db.Date
+  period    Int // 1 to 5
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+
+  // Relations
+  mdcCourseId String @db.Uuid
+  studentId   String @db.Uuid
+  markedBy    String @db.Uuid // Faculty who marked
+
+  mdcCourse MDCCourse      @relation(fields: [mdcCourseId], references: [id], onDelete: Cascade)
+  student   StudentProfile @relation("MDCAttendance", fields: [studentId], references: [id])
+  faculty   FacultyProfile @relation("MDCAttendanceMarked", fields: [markedBy], references: [id])
+
+  // Unique constraint: One record per student per MDC course per date per period
+  @@unique([mdcCourseId, studentId, date, period])
+  // Indexes for queries
+  @@index([studentId, date])
+  @@index([markedBy, date])
+  @@index([mdcCourseId, date])
+  @@map("mdc_attendance_records")
+}
+
+// ============================================================================
+//
+// STORAGE ESTIMATES (per academic year):
+// - Attendance: 400 students × 5 periods × ~150 working days = 300,000 records/year
+// - After 4 years: ~1.2 million attendance records (manageable with indexes)
+//
+// QUERY PERFORMANCE OPTIMIZATIONS:
+// 1. Student dashboard: Uses (studentId, date) index
+// 2. Faculty marking: Uses (markedBy, date) index
+// 3. Subject reports: Uses (subjectId, date) index
+// 4. Unique constraint prevents double-marking
+//
+// SOFT DELETE STRATEGY:
+// - Users have deletedAt field (null = active)
+// - Profiles cascade delete with User
+// - Attendance records preserved (markedBy reference intact)
+//
+// ============================================================================
