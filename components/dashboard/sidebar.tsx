@@ -18,6 +18,7 @@ import {
   Building2,
   Bell,
   CalendarCheck,
+  ArrowRightLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -50,8 +51,9 @@ const menuItems = {
     { href: "/dashboard/admin", label: "Dashboard", icon: Home },
     { href: "/dashboard/admin/users", label: "Users", icon: Users },
     { href: "/dashboard/admin/departments", label: "Departments", icon: Building2 },
+    { href: "/dashboard/admin/semester-management", label: "Semester Management", icon: ArrowRightLeft },
     { href: "/dashboard/admin/courses", label: "Courses", icon: BookOpen },
-    { href: "/dashboard/admin/attendance", label: "Attendance", icon: ClipboardCheck },
+    { href: "/dashboard/admin/attendance", label: "Attendance Progress", icon: ClipboardCheck },
     { href: "/dashboard/admin/notices", label: "Notice Board", icon: Bell },
     { href: "/dashboard/admin/events", label: "Events Calendar", icon: CalendarCheck },
     { href: "/dashboard/admin/analytics", label: "Analytics", icon: Building2 },

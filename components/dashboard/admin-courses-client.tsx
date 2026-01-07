@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { createSubject, updateSubject, deleteSubject } from "@/actions/admin/subjects"
+import { exportToCSV, getTimestampedFilename } from "@/lib/csv-export"
 
 interface SubjectData {
     id: string
@@ -191,6 +192,30 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
         }
     }
 
+    // Handle export courses
+    const handleExportCourses = () => {
+        // Export filtered courses (respects search and department filters)
+        const exportData = filteredSubjects.map(s => ({
+            "Course Code": s.code,
+            "Course Name": s.name,
+            "Department": s.departmentName,
+            "Semester": `Semester ${s.semester}`,
+            "Type": s.type.charAt(0).toUpperCase() + s.type.slice(1),
+            "Credits": s.credits,
+            "Faculty": s.facultyName
+        }))
+
+        const headers = ["Course Code", "Course Name", "Department", "Semester", "Type", "Credits", "Faculty"]
+        const filename = getTimestampedFilename("courses-export")
+
+        exportToCSV(exportData, headers, filename)
+
+        toast({
+            title: "Export Successful",
+            description: `Exported ${filteredSubjects.length} course(s) to ${filename}`,
+        })
+    }
+
     // Handle delete
     const handleDeleteSubject = async () => {
         if (!selectedSubject) return
@@ -224,42 +249,42 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
 
                 <main className="p-6 space-y-6">
                     {/* Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <Card>
-                            <CardContent className="p-6">
+                            <CardContent className="p-3 sm:p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                                        <BookOpen className="h-6 w-6 text-primary" />
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                                        <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Total Courses</p>
-                                        <p className="text-2xl font-bold text-foreground">{subjects.length}</p>
+                                        <p className="text-lg sm:text-2xl font-bold text-foreground">{subjects.length}</p>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                         <Card>
-                            <CardContent className="p-6">
+                            <CardContent className="p-3 sm:p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                                        <Users className="h-6 w-6 text-accent" />
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                                        <Users className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Departments</p>
-                                        <p className="text-2xl font-bold text-foreground">{departmentNames.length}</p>
+                                        <p className="text-lg sm:text-2xl font-bold text-foreground">{departmentNames.length}</p>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                         <Card>
-                            <CardContent className="p-6">
+                            <CardContent className="p-3 sm:p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-lg bg-chart-3/10 flex items-center justify-center">
-                                        <BookOpen className="h-6 w-6 text-chart-3" />
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-chart-3/10 flex items-center justify-center">
+                                        <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-chart-3" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Theory</p>
-                                        <p className="text-2xl font-bold text-foreground">
+                                        <p className="text-lg sm:text-2xl font-bold text-foreground">
                                             {subjects.filter(s => s.type === "theory").length}
                                         </p>
                                     </div>
@@ -267,14 +292,14 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                             </CardContent>
                         </Card>
                         <Card>
-                            <CardContent className="p-6">
+                            <CardContent className="p-3 sm:p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-lg bg-chart-4/10 flex items-center justify-center">
-                                        <BookOpen className="h-6 w-6 text-chart-4" />
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-chart-4/10 flex items-center justify-center">
+                                        <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-chart-4" />
                                     </div>
                                     <div>
                                         <p className="text-sm text-muted-foreground">Practical</p>
-                                        <p className="text-2xl font-bold text-foreground">
+                                        <p className="text-lg sm:text-2xl font-bold text-foreground">
                                             {subjects.filter(s => s.type === "practical").length}
                                         </p>
                                     </div>
@@ -292,7 +317,7 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                                     <CardDescription>Manage academic courses and subjects</CardDescription>
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button variant="outline">
+                                    <Button variant="outline" onClick={handleExportCourses}>
                                         <Download className="h-4 w-4 mr-2" />
                                         Export
                                     </Button>

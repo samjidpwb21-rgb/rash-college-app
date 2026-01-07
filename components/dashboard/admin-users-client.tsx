@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast"
 import { createUser, updateUser, deleteUser } from "@/actions/admin/users"
 import { getPublicDepartments } from "@/actions/auth/register"
 import { getAllSemesters } from "@/actions/admin/semesters"
+import { exportToCSV, getTimestampedFilename } from "@/lib/csv-export"
 
 interface UserData {
     id: string
@@ -302,6 +303,29 @@ export function AdminUsersClient({ users }: AdminUsersClientProps) {
         }
     }
 
+    // Handle export users
+    const handleExportUsers = () => {
+        // Export filtered users (respects search, role, and status filters)
+        const exportData = filteredUsers.map(u => ({
+            "User ID": u.id,
+            "Name": u.name,
+            "Email": u.email,
+            "Role": u.role.charAt(0).toUpperCase() + u.role.slice(1),
+            "Department": u.department,
+            "Status": u.status.charAt(0).toUpperCase() + u.status.slice(1)
+        }))
+
+        const headers = ["User ID", "Name", "Email", "Role", "Department", "Status"]
+        const filename = getTimestampedFilename("users-export")
+
+        exportToCSV(exportData, headers, filename)
+
+        toast({
+            title: "Export Successful",
+            description: `Exported ${filteredUsers.length} user(s) to ${filename}`,
+        })
+    }
+
     // Handle delete user (soft delete)
     const handleDeleteUser = async () => {
         if (!selectedUser) return
@@ -410,7 +434,7 @@ export function AdminUsersClient({ users }: AdminUsersClientProps) {
                                     <CardDescription>Manage students, faculty, and administrators</CardDescription>
                                 </div>
                                 <div className="flex gap-3">
-                                    <Button variant="outline">
+                                    <Button variant="outline" onClick={handleExportUsers}>
                                         <Download className="h-4 w-4 mr-2" />
                                         Export
                                     </Button>
