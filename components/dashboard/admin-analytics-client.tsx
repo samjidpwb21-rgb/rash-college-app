@@ -1,6 +1,7 @@
 "use client"
 
-import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { useState } from "react"
+import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -50,6 +51,8 @@ export function AnalyticsClient({
     attendanceDistribution,
     hourlyPattern
 }: AnalyticsClientProps) {
+    const [sidebarOpen, setSidebarOpen] = useState(false)
+
     const user = {
         name: "Admin User",
         email: "admin@university.edu",
@@ -148,19 +151,20 @@ export function AnalyticsClient({
     return (
         <div className="min-h-screen bg-slate-900">
             <DashboardSidebar role="admin" />
+            <MobileSidebar role="admin" open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
             <div className="lg:ml-64">
-                <DashboardHeader title="Analytics & Reports" user={user} />
+                <DashboardHeader title="Analytics & Reports" user={user} onMenuClick={() => setSidebarOpen(true)} />
 
                 <main className="p-6 space-y-6">
                     <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                         <div>
-                            <h2 className="text-2xl font-bold text-foreground">Attendance Analytics</h2>
-                            <p className="text-muted-foreground">Comprehensive insights and trends</p>
+                            <h2 className="text-2xl font-bold text-white">Attendance Analytics</h2>
+                            <p className="text-white">Comprehensive insights and trends</p>
                         </div>
                         <div className="flex gap-3">
                             <Select defaultValue="semester">
-                                <SelectTrigger className="w-40">
+                                <SelectTrigger className="w-40 text-white">
                                     <SelectValue placeholder="Time Period" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -177,7 +181,7 @@ export function AnalyticsClient({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <Card>
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">

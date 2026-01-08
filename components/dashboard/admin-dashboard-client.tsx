@@ -70,35 +70,35 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                             value={String(data.stats.totalStudents)}
                             description="Active students"
                             icon={GraduationCap}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-2xl bg-card border-border"
                         />
                         <StatsCard
                             title="Total Faculty"
                             value={String(data.stats.totalFaculty)}
                             description="Active faculty"
                             icon={Users}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-2xl bg-card border-border"
                         />
                         <StatsCard
                             title="Subjects"
                             value={String(data.stats.totalSubjects)}
                             description="Total courses"
                             icon={BookOpen}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-2xl bg-card border-border"
                         />
                         <StatsCard
                             title="Departments"
                             value={String(data.stats.totalDepartments)}
                             description="Academic departments"
                             icon={Building2}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-2xl bg-card border-border"
                         />
                     </div>
 
                     {/* Main Content */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {/* User Distribution Chart */}
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-2xl bg-card border-border">
                             <CardHeader>
                                 <CardTitle>User Distribution</CardTitle>
                                 <CardDescription>Active users by role</CardDescription>
@@ -138,7 +138,7 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                         </Card>
 
                         {/* Recent Notices */}
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-2xl bg-card border-border">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -183,7 +183,7 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                         </Card>
 
                         {/* Upcoming Events */}
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-2xl bg-card border-border">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -226,7 +226,7 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                     </div>
 
                     {/* Quick Actions */}
-                    <Card className="shadow-2xl bg-white border-slate-200">
+                    <Card className="shadow-2xl bg-card border-border">
                         <CardHeader>
                             <CardTitle>Quick Actions</CardTitle>
                             <CardDescription>Administrative tasks</CardDescription>

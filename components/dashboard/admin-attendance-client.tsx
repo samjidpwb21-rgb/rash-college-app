@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,6 +49,7 @@ export function AttendanceOverviewClient({
     lowAttendanceStudents,
     recentRecords
 }: AttendanceOverviewClientProps) {
+    const [sidebarOpen, setSidebarOpen] = useState(false)
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedDate, setSelectedDate] = useState("")
 
@@ -63,13 +64,14 @@ export function AttendanceOverviewClient({
     return (
         <div className="min-h-screen bg-slate-900">
             <DashboardSidebar role="admin" />
+            <MobileSidebar role="admin" open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
             <div className="lg:ml-64">
-                <DashboardHeader title="Attendance Overview" user={user} />
+                <DashboardHeader title="Attendance Overview" user={user} onMenuClick={() => setSidebarOpen(true)} />
 
                 <main className="p-6 space-y-6">
                     {/* Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <Card>
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
