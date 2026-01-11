@@ -2,6 +2,8 @@ import { ProfilePage } from "@/components/profile/profile-page"
 import { getMyProfile } from "@/actions/shared/profile"
 import { redirect } from "next/navigation"
 
+export const dynamic = "force-dynamic"
+
 export default async function AdminProfilePage() {
     const result = await getMyProfile()
 
