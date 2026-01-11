@@ -29,6 +29,7 @@ interface StudentDashboardProps {
         user: {
             name: string
             email: string
+            avatar?: string | null
             departmentName: string
             semesterNumber: number
         }
@@ -70,6 +71,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
     const user = {
         name: data.user.name,
         email: data.user.email,
+        avatar: data.user.avatar,
         role: `${data.user.departmentName} - Semester ${data.user.semesterNumber}`,
     }
 

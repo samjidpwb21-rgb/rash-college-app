@@ -166,20 +166,19 @@ export const authOptions: NextAuthOptions = {
                 token.email = user.email
                 token.name = user.name
                 token.role = user.role
-                token.avatar = user.avatar
+                token.role = user.role
+                // avatar removed to prevent large cookie size
             }
             return token
         },
 
         // Session callback - called when session is accessed
         async session({ session, token }) {
-            // Add token data to session
             session.user = {
                 id: token.id,
                 email: token.email,
                 name: token.name,
                 role: token.role,
-                avatar: token.avatar,
             }
             return session
         },

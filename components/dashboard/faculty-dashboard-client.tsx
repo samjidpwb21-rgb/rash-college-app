@@ -28,6 +28,7 @@ interface FacultyDashboardProps {
         user: {
             name: string
             email: string
+            avatar?: string | null
             departmentName: string
             designation: string
             facultyId: string  // For MDC course queries
@@ -144,6 +145,7 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
     const user = {
         name: data.user.name,
         email: data.user.email,
+        avatar: data.user.avatar,
         role: `${data.user.designation} - ${data.user.departmentName}`,
     }
 

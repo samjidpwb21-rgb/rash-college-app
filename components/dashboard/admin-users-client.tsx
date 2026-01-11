@@ -215,7 +215,7 @@ export function AdminUsersClient({ users }: AdminUsersClientProps) {
         setIsLoading(true)
 
         try {
-            console.log("Creating user with data:", { name: formName, email: formEmail, role: formRole, departmentId: formDepartmentId, semesterId: formSemesterId })
+
 
             const result = await createUser({
                 name: formName,
@@ -226,7 +226,7 @@ export function AdminUsersClient({ users }: AdminUsersClientProps) {
                 semesterId: formRole === "STUDENT" ? formSemesterId : undefined,
             })
 
-            console.log("Create user result:", result)
+
 
             if (result.success) {
                 toast({

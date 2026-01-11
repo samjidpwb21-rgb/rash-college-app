@@ -24,7 +24,7 @@ interface DashboardHeaderProps {
   user: {
     name: string
     email: string
-    avatar?: string | null // fixed type
+    avatar?: string | null
     role: string
   }
   onMenuClick?: () => void
@@ -55,7 +55,7 @@ export function DashboardHeader({ title, user, onMenuClick, hideSearch }: Dashbo
         setNotifications(notifResult.data)
       }
       if (countResult.success) {
-        setUnreadCount(countResult.data)
+        setUnreadCount(countResult.data.count)
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error)

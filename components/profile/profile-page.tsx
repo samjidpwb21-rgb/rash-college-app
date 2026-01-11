@@ -97,7 +97,8 @@ export function ProfilePage({ initialData }: ProfilePageProps) {
                 setAvatarPreview(result.data.url)
                 router.refresh()
             } else {
-                toast.error("error" in result ? result.error : "Failed to upload image")
+                const errorMsg = "error" in result ? result.error : "Failed to upload image"
+                toast.error(errorMsg)
                 // Revert preview on failure
                 setAvatarPreview(initialData.avatar)
             }
@@ -164,7 +165,7 @@ export function ProfilePage({ initialData }: ProfilePageProps) {
                                 type="file"
                                 ref={fileInputRef}
                                 className="hidden"
-                                accept="image/jpeg,image/png,image/webp"
+                                accept="image/*"
                                 onChange={handleFileChange}
                                 disabled={isUploading}
                             />

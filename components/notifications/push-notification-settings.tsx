@@ -24,11 +24,11 @@ export function PushNotificationSettings() {
     }, [error])
 
     const handleToggle = async (checked: boolean) => {
-        console.log('[Settings] Toggle clicked:', checked)
+
 
         if (checked) {
             // Enable push notifications
-            console.log('[Settings] Attempting to enable push notifications...')
+
             const success = await subscribe()
             if (success) {
                 toast.success('Push notifications enabled!')
@@ -37,7 +37,7 @@ export function PushNotificationSettings() {
             }
         } else {
             // Disable push notifications
-            console.log('[Settings] Attempting to disable push notifications...')
+
             const success = await unsubscribe()
             if (success) {
                 toast.success('Push notifications disabled')

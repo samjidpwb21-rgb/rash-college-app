@@ -19,6 +19,7 @@ interface StudentDashboardData {
   user: {
     name: string
     email: string
+    avatar?: string | null
     departmentName: string
     semesterNumber: number
   }
@@ -66,7 +67,7 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
     const studentProfile = await prisma.studentProfile.findUnique({
       where: { userId: session.user.id },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, avatar: true } },
         department: { select: { name: true } },
         semester: {
           include: { academicYear: true }
@@ -180,6 +181,7 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
       user: {
         name: studentProfile.user.name,
         email: studentProfile.user.email,
+        avatar: studentProfile.user.avatar,
         departmentName: studentProfile.department.name,
         semesterNumber: studentProfile.semester.number,
       },
@@ -209,6 +211,7 @@ interface FacultyDashboardData {
   user: {
     name: string
     email: string
+    avatar?: string | null
     departmentName: string
     designation: string
     facultyId: string  // For MDC course queries
@@ -265,7 +268,7 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
     const facultyProfile = await prisma.facultyProfile.findUnique({
       where: { userId: session.user.id },
       include: {
-        user: { select: { name: true, email: true } },
+        user: { select: { name: true, email: true, avatar: true } },
         department: { select: { name: true } },
         subjectsAssigned: {
           include: {
@@ -393,6 +396,7 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
       user: {
         name: facultyProfile.user.name,
         email: facultyProfile.user.email,
+        avatar: facultyProfile.user.avatar,
         departmentName: facultyProfile.department.name,
         designation: facultyProfile.designation,
         facultyId: facultyProfile.id,  // For MDC queries
@@ -421,6 +425,7 @@ interface AdminDashboardData {
   user: {
     name: string
     email: string
+    avatar?: string | null
     role: string
   }
   stats: {
@@ -502,6 +507,7 @@ export async function getAdminDashboardData(): Promise<ActionResult<AdminDashboa
       user: {
         name: session.user.name || "Admin",
         email: session.user.email || "admin@campustrack.edu",
+        avatar: session.user.avatar,
         role: "System Administrator"
       },
       stats: {

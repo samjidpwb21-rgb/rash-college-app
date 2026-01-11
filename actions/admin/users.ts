@@ -328,7 +328,7 @@ export async function getUsers(
                 id: true,
                 email: true,
                 name: true,
-                avatar: true,
+
                 role: true,
                 isActive: true,
                 deletedAt: true,

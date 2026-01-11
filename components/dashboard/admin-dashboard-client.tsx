@@ -23,6 +23,7 @@ interface AdminDashboardProps {
         user: {
             name: string
             email: string
+            avatar?: string | null
             role: string
         }
         stats: {

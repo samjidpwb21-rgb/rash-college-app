@@ -75,7 +75,7 @@ model User {
   email        String    @unique @db.VarChar(255)
   passwordHash String    @db.VarChar(255)
   name         String    @db.VarChar(100)
-  avatar       String?   @db.VarChar(500) // URL to profile image
+  avatar       String?   @db.Text // Base64 or URL to profile image
   role         Role
   isActive     Boolean   @default(true)
   deletedAt    DateTime? // Soft delete - null means active

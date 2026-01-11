@@ -56,11 +56,17 @@ export async function getMyProfile(): Promise<ActionResult<ProfileData>> {
     try {
         const user = await getCurrentUser()
 
+        // Fetch fresh avatar explicitly because session no longer carries it to avoid cookie bloat
+        const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { avatar: true }
+        })
+
         const baseData = {
             name: user.name,
             email: user.email,
             role: user.role,
-            avatar: user.avatar ?? null,
+            avatar: dbUser?.avatar ?? null,
             id: user.id
         }
 
@@ -166,7 +172,9 @@ export async function uploadProfilePicture(formData: FormData): Promise<ActionRe
         const user = await getCurrentUser()
         const file = formData.get("file") as File
 
-        if (!file) return errorResponse("No file provided")
+        if (!file) {
+            return errorResponse("No file provided")
+        }
 
         // Validation
         const bytes = await file.arrayBuffer()
@@ -177,9 +185,14 @@ export async function uploadProfilePicture(formData: FormData): Promise<ActionRe
             return errorResponse("File size too large (max 2MB)")
         }
 
-        const validTypes = ["image/jpeg", "image/png", "image/webp"]
+        // Support all common image formats
+        const validTypes = [
+            "image/jpeg", "image/png", "image/webp", "image/gif",
+            "image/bmp", "image/tiff", "image/svg+xml",
+            "image/heic", "image/heif", "image/avif"
+        ]
         if (!validTypes.includes(file.type)) {
-            return errorResponse("Invalid file type (JPG, PNG, WebP only)")
+            return errorResponse("Invalid file type. Supported: JPG, PNG, WebP, GIF, BMP, TIFF, SVG, HEIC, AVIF")
         }
 
         // Convert to base64 data URL
