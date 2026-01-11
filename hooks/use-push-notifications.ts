@@ -35,7 +35,18 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
         if (supported) {
             setPermission(Notification.permission)
-            checkSubscription()
+
+            // Check subscription after service worker is ready
+            navigator.serviceWorker.ready.then(() => {
+                checkSubscription()
+            }).catch(() => {
+                // Service worker not ready yet, try to register
+                navigator.serviceWorker.register('/sw.js').then(() => {
+                    checkSubscription()
+                }).catch((err) => {
+                    console.error('[Push Hook] Service worker registration failed:', err)
+                })
+            })
         }
     }, [])
 
@@ -45,8 +56,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             const registration = await navigator.serviceWorker.ready
             const subscription = await registration.pushManager.getSubscription()
             setIsSubscribed(!!subscription)
+            return !!subscription
         } catch (err) {
             console.error('[Push Hook] Error checking subscription:', err)
+            setIsSubscribed(false)
+            return false
         }
     }, [])
 
@@ -90,6 +104,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             if (Notification.permission !== 'granted') {
                 const permitted = await requestPermission()
                 if (!permitted) {
+                    setError('Permission denied')
                     return false
                 }
             }
@@ -97,10 +112,19 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             // Register service worker
             let registration = await navigator.serviceWorker.getRegistration()
             if (!registration) {
+                console.log('[Push Hook] Registering service worker...')
                 registration = await navigator.serviceWorker.register('/sw.js')
+                // Wait for service worker to be ready
+                await navigator.serviceWorker.ready
             }
 
-            await navigator.serviceWorker.ready
+            // Double-check if already subscribed
+            const existingSub = await registration.pushManager.getSubscription()
+            if (existingSub) {
+                console.log('[Push Hook] Already subscribed')
+                setIsSubscribed(true)
+                return true
+            }
 
             // Get VAPID public key from environment
             const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -110,11 +134,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
                 return false
             }
 
+            console.log('[Push Hook] Creating push subscription...')
+
             // Subscribe to push manager
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicKey),
             })
+
+            console.log('[Push Hook] Subscription created, saving to server...')
 
             // Send subscription to server
             const response = await fetch('/api/push/subscribe', {
@@ -126,19 +154,26 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             })
 
             if (!response.ok) {
-                throw new Error('Failed to save subscription to server')
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Failed to save subscription to server')
             }
 
+            console.log('[Push Hook] Subscription saved successfully')
             setIsSubscribed(true)
+
+            // Re-check subscription to ensure state is synced
+            await checkSubscription()
+
             return true
         } catch (err: any) {
             console.error('[Push Hook] Subscribe error:', err)
             setError(err.message || 'Failed to subscribe')
+            setIsSubscribed(false)
             return false
         } finally {
             setIsLoading(false)
         }
-    }, [isSupported, requestPermission])
+    }, [isSupported, requestPermission, checkSubscription])
 
     // Unsubscribe from push notifications
     const unsubscribe = useCallback(async (): Promise<boolean> => {
@@ -150,6 +185,8 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             const subscription = await registration.pushManager.getSubscription()
 
             if (subscription) {
+                console.log('[Push Hook] Unsubscribing from push notifications...')
+
                 // Unsubscribe from push manager
                 await subscription.unsubscribe()
 
@@ -161,9 +198,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
                     },
                     body: JSON.stringify({ endpoint: subscription.endpoint }),
                 })
+
+                console.log('[Push Hook] Unsubscribed successfully')
             }
 
             setIsSubscribed(false)
+
+            // Re-check subscription to ensure state is synced
+            await checkSubscription()
+
             return true
         } catch (err: any) {
             console.error('[Push Hook] Unsubscribe error:', err)
@@ -172,7 +215,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         } finally {
             setIsLoading(false)
         }
-    }, [])
+    }, [checkSubscription])
 
     return {
         isSupported,
