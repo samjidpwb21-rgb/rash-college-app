@@ -121,7 +121,7 @@ export function StudentAttendanceClient({ data }: StudentAttendanceProps) {
 
                 <main className="p-6 space-y-6">
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         <Card>
                             <CardContent className="p-6">
                                 <div className="flex items-center gap-4">
@@ -210,8 +210,8 @@ export function StudentAttendanceClient({ data }: StudentAttendanceProps) {
                                         <div
                                             key={index}
                                             className={`flex items-center justify-between p-4 rounded-lg border border-border ${period.status === "not-applicable"
-                                                    ? "bg-muted/10 opacity-40"
-                                                    : "bg-muted/30 hover:bg-muted/50 transition-colors"
+                                                ? "bg-muted/10 opacity-40"
+                                                : "bg-muted/30 hover:bg-muted/50 transition-colors"
                                                 }`}
                                         >
                                             <div className="flex-1">

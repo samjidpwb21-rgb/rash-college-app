@@ -6,7 +6,7 @@
 // Client wrapper for interactive elements (charts, sidebar toggle)
 // Data is passed from server component
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -19,6 +19,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Calendar, ClipboardCheck, Clock, GraduationCap, User, ArrowRight } from "lucide-react"
 import { getSubjectColor } from "@/lib/chart-colors"
 import { CustomBarTooltip } from "@/lib/custom-bar-tooltip"
+import { useLoading } from "@/contexts/loading-context"
+import { DailyAttendanceBar } from "@/components/dashboard/daily-attendance-bar"
+import { DailyAttendanceBlock } from "@/actions/daily-attendance"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 interface StudentDashboardProps {
     data: {
@@ -55,17 +59,24 @@ interface StudentDashboardProps {
             faculty: string
             progress: number
         }>
+        dailyAttendance: DailyAttendanceBlock[]
     }
 }
 
 export function StudentDashboardClient({ data }: StudentDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const { forceFinishAll } = useLoading()
 
     const user = {
         name: data.user.name,
         email: data.user.email,
         role: `${data.user.departmentName} - Semester ${data.user.semesterNumber}`,
     }
+
+    // Force clear any stuck loading states when dashboard mounts
+    useEffect(() => {
+        forceFinishAll()
+    }, [])
 
     // Transform subject attendance for chart
     const attendanceChartData = data.subjectAttendance.map((s) => ({
@@ -80,11 +91,10 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
         { name: "Absent", value: 100 - data.stats.overallAttendance, color: "#ef4444" },
     ]
 
-    // Period times
-    const periodTimes = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:00 PM"]
+    // Period times are now handled in the server action using centralized lib/period-times.ts
 
     return (
-        <div className="min-h-screen bg-slate-900">
+        <div className="min-h-screen bg-background">
             <DashboardSidebar role="student" />
             <MobileSidebar role="student" open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
@@ -92,42 +102,48 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                 <DashboardHeader title="Student Dashboard" user={user} onMenuClick={() => setSidebarOpen(true)} hideSearch={true} />
 
                 <main className="p-4 sm:p-6 space-y-6">
+                    {/* PWA Install Prompt */}
+                    <PwaInstallPrompt variant="banner" />
+
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <StatsCard
                             title="Overall Attendance"
                             value={`${data.stats.overallAttendance}%`}
                             description="This semester"
                             icon={ClipboardCheck}
                             trend={data.stats.overallAttendance >= 75 ? { value: 0, positive: true } : undefined}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Classes Today"
                             value={String(data.stats.classesToday)}
                             description={data.todaySchedule[0]?.subject ? `Next: ${data.todaySchedule[0].subject}` : "No classes"}
                             icon={Calendar}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Total Subjects"
                             value={String(data.stats.totalSubjects)}
                             description="Active courses"
                             icon={GraduationCap}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Classes Attended"
                             value={String(data.stats.classesAttended)}
                             description={`Out of ${data.stats.totalClasses} total`}
                             icon={Clock}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                     </div>
 
+                    {/* Daily Attendance Status Bar */}
+                    <DailyAttendanceBar blocks={data.dailyAttendance} />
+
                     {/* Charts Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <Card className="lg:col-span-2 shadow-2xl bg-white border-slate-200">
+                        <Card className="lg:col-span-2 shadow-lg">
                             <CardHeader>
                                 <CardTitle>Subject-wise Attendance</CardTitle>
                                 <CardDescription>Your attendance percentage by subject</CardDescription>
@@ -157,7 +173,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                             </CardContent>
                         </Card>
 
-                        <Card className="lg:col-span-1 shadow-2xl bg-white border-slate-200">
+                        <Card className="lg:col-span-1 shadow-lg">
                             <CardHeader>
                                 <CardTitle>Overall Status</CardTitle>
                                 <CardDescription>Attendance distribution</CardDescription>
@@ -199,7 +215,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
 
                     {/* Schedule and Breakdown */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-lg">
                             <CardHeader>
                                 <CardTitle>Today's Schedule</CardTitle>
                                 <CardDescription>Upcoming classes for today</CardDescription>
@@ -233,7 +249,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                             </CardContent>
                         </Card>
 
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-lg">
                             <CardHeader>
                                 <CardTitle>Detailed Breakdown</CardTitle>
                                 <CardDescription>Classes attended per subject</CardDescription>
@@ -263,7 +279,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                     </div>
 
                     {/* Current Semester Courses */}
-                    <Card className="shadow-2xl bg-white border-slate-200">
+                    <Card className="shadow-lg">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>

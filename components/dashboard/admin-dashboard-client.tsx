@@ -5,7 +5,7 @@
 // ============================================================================
 // Client wrapper for interactive elements
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { Users, BookOpen, Building2, GraduationCap, ArrowRight, Bell, Calendar } from "lucide-react"
+import { useLoading } from "@/contexts/loading-context"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 interface AdminDashboardProps {
     data: {
@@ -51,8 +53,15 @@ interface AdminDashboardProps {
 
 export function AdminDashboardClient({ data }: AdminDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const { forceFinishAll } = useLoading()
 
     const user = data.user
+
+    // Force clear any stuck loading states when dashboard mounts
+    // This ensures the login loading animation stops even if there are orphaned operations
+    useEffect(() => {
+        forceFinishAll()
+    }, [])
 
     return (
         <div className="min-h-screen bg-slate-900">
@@ -63,6 +72,9 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                 <DashboardHeader title="Admin Dashboard" user={user} onMenuClick={() => setSidebarOpen(true)} hideSearch={true} />
 
                 <main className="p-4 sm:p-6 space-y-6">
+                    {/* PWA Install Prompt */}
+                    <PwaInstallPrompt variant="banner" />
+
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <StatsCard

@@ -21,6 +21,7 @@ export async function createSubject(
         name: string
         credits?: number
         type?: "THEORY" | "PRACTICAL"
+        isMDC?: boolean
         description?: string
         departmentId: string
         semesterId: string
@@ -70,6 +71,7 @@ export async function createSubject(
                 name: validated.data.name,
                 credits: validated.data.credits ?? 3,
                 type: validated.data.type ?? "THEORY",
+                isMDC: validated.data.isMDC ?? false,
                 description: validated.data.description,
                 departmentId: validated.data.departmentId,
                 semesterId: validated.data.semesterId,

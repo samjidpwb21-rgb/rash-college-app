@@ -7,6 +7,8 @@
 import { prisma } from "@/lib/db"
 import { getSession } from "@/lib/auth"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
+import { getPeriodTimeDisplay } from "@/lib/period-times"
+import { sendPushToUser } from "@/lib/push-notifications"
 
 interface FacultyClassesData {
     user: {
@@ -124,7 +126,7 @@ export async function getFacultyClassesData(): Promise<ActionResult<FacultyClass
             })
             const markedSet = new Set(markedSubjects.map((m) => m.subjectId))
 
-            const periodTimes = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:00 PM"]
+            // Period times use centralized utility with Friday support
 
             todayClasses = await Promise.all(
                 timetable.map(async (t) => {
@@ -137,7 +139,7 @@ export async function getFacultyClassesData(): Promise<ActionResult<FacultyClass
 
                     return {
                         period: t.period,
-                        time: periodTimes[t.period - 1] || `Period ${t.period}`,
+                        time: getPeriodTimeDisplay(dayOfWeek, t.period),
                         subjectId: t.subject.id,
                         subjectCode: t.subject.code,
                         subjectName: t.subject.name,
@@ -342,7 +344,7 @@ export async function submitAttendance(data: AttendanceSubmission): Promise<Acti
 
         await prisma.$transaction(upsertPromises)
 
-        // Create notifications for students
+        // Create in-app notifications for students
         const uniqueStudents = [...new Set(data.records.map((r) => r.studentId))]
         const notificationPromises = uniqueStudents.map(async (studentId) => {
             const student = await prisma.studentProfile.findUnique({
@@ -363,7 +365,29 @@ export async function submitAttendance(data: AttendanceSubmission): Promise<Acti
             }
         })
 
-        await Promise.all(notificationPromises.filter(Boolean))
+        const createdNotifications = await Promise.all(notificationPromises.filter(Boolean))
+
+        // NEW: Send push notifications (additive, non-blocking)
+        // This runs in the background and doesn't affect the response
+        Promise.all(
+            uniqueStudents.map(async (studentId) => {
+                const student = await prisma.studentProfile.findUnique({
+                    where: { id: studentId },
+                    select: { userId: true },
+                })
+                if (student) {
+                    await sendPushToUser(student.userId, {
+                        title: "Attendance Updated",
+                        message: `Your attendance for ${subject.name} on ${attendanceDate.toLocaleDateString()} has been marked.`,
+                        link: "/dashboard/student/attendance",
+                        type: "ATTENDANCE",
+                    })
+                }
+            })
+        ).catch((error) => {
+            // Log push errors but don't fail the request
+            console.error('[Push] Error sending attendance push notifications:', error)
+        })
 
         return successResponse({ count: data.records.length })
     } catch (error) {

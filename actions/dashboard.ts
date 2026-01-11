@@ -8,6 +8,8 @@
 import { prisma } from "@/lib/db"
 import { getCurrentUser, getSession } from "@/lib/auth"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
+import { getPeriodTimeDisplay } from "@/lib/period-times"
+import { getDailyAttendanceStatus, DailyAttendanceBlock } from "@/actions/daily-attendance"
 
 // ============================================================================
 // STUDENT DASHBOARD QUERIES
@@ -47,6 +49,7 @@ interface StudentDashboardData {
     faculty: string
     progress: number
   }>
+  dailyAttendance: DailyAttendanceBlock[]
 }
 
 /**
@@ -115,10 +118,10 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
         orderBy: { period: "asc" },
       })
 
-      const periodTimes = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:00 PM"]
+      // Period times now use centralized utility with Friday support
       todaySchedule = timetable.map((t) => ({
         period: t.period,
-        time: periodTimes[t.period - 1] || `Period ${t.period}`,
+        time: getPeriodTimeDisplay(dayOfWeek, t.period),
         subject: t.subject.name,
         room: t.room,
         faculty: t.faculty.user.name,
@@ -170,6 +173,9 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
       progress: subjectAttendance.find(sa => sa.code === s.code)?.percentage || 0,
     }))
 
+    // Get today's daily attendance status (5 periods)
+    const dailyAttendance = await getDailyAttendanceStatus(studentProfile.id)
+
     return successResponse({
       user: {
         name: studentProfile.user.name,
@@ -187,6 +193,7 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
       subjectAttendance,
       todaySchedule,
       currentCourses,
+      dailyAttendance,
     })
   } catch (error) {
     console.error("Student dashboard error:", error)
@@ -228,6 +235,19 @@ interface FacultyDashboardData {
     code: string
     name: string
     semester: number
+  }>
+  weeklyTimetable: Array<{
+    id: string
+    dayOfWeek: number
+    period: number
+    room: string | null
+    subject: {
+      name: string
+      code: string
+    }
+    semester: {
+      number: number
+    }
   }>
 }
 
@@ -280,7 +300,7 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
         orderBy: { period: "asc" },
       })
 
-      const periodTimes = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:00 PM"]
+      // Period times use centralized utility with Friday support
 
       // Check which classes have attendance marked today
       const markedSubjects = await prisma.attendanceRecord.findMany({
@@ -305,7 +325,7 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
 
           return {
             period: t.period,
-            time: periodTimes[t.period - 1] || `Period ${t.period}`,
+            time: getPeriodTimeDisplay(dayOfWeek, t.period),
             subjectId: t.subject.id,
             subjectCode: t.subject.code,
             subjectName: t.subject.name,
@@ -345,6 +365,30 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
       semester: sa.subject.semester.number,
     }))
 
+    // Get full weekly timetable for faculty
+    const weeklyTimetable = await prisma.timetable.findMany({
+      where: {
+        facultyId: facultyProfile.id,
+      },
+      include: {
+        subject: {
+          select: {
+            name: true,
+            code: true,
+          },
+        },
+        semester: {
+          select: {
+            number: true,
+          },
+        },
+      },
+      orderBy: [
+        { dayOfWeek: 'asc' },
+        { period: 'asc' },
+      ],
+    })
+
     return successResponse({
       user: {
         name: facultyProfile.user.name,
@@ -361,6 +405,7 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
       },
       todayClasses,
       subjects,
+      weeklyTimetable,
     })
   } catch (error) {
     console.error("Faculty dashboard error:", error)

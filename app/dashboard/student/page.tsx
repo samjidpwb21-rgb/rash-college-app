@@ -43,6 +43,7 @@ export default async function StudentDashboard() {
       subjectAttendance: [],
       todaySchedule: [],
       currentCourses: [],
+      dailyAttendance: [],
     }
     return <StudentDashboardClient data={emptyData} />
   }

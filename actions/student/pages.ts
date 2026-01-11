@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/db"
 import { getSession } from "@/lib/auth"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
+import { getPeriodTimeDisplay } from "@/lib/period-times"
 
 // ============================================================================
 // SCHEDULE PAGE DATA
@@ -38,7 +39,7 @@ interface SchedulePageData {
     }
 }
 
-const periodTimes = ["09:30 - 10:20", "10:20 - 11:20", "11:30 - 12:30", "01:30 - 02:30", "02:30 - 03:30"]
+// Period times now use centralized utility (lib/period-times.ts)
 
 /**
  * Get student timetable for schedule page
@@ -94,7 +95,7 @@ export async function getStudentScheduleData(): Promise<ActionResult<SchedulePag
             if (dayName in timetable) {
                 timetable[dayName].push({
                     period: entry.period,
-                    time: periodTimes[entry.period - 1] || `Period ${entry.period}`,
+                    time: getPeriodTimeDisplay(entry.dayOfWeek, entry.period),
                     subject: entry.subject.name,
                     code: entry.subject.code,
                     faculty: entry.faculty.user.name,

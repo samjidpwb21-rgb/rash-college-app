@@ -45,6 +45,39 @@ export default async function MDCConfigurationPage({
         redirect("/dashboard/admin/departments")
     }
 
+    // Fetch available MDC subjects from the selected department
+    // RULE: isMDC = true AND departmentId = mdcDeptId (excludes home department)
+    const availableMDCSubjects = await prisma.subject.findMany({
+        where: {
+            isMDC: true,
+            departmentId: mdcDeptId,  // Only from the MDC department
+        },
+        select: {
+            id: true,
+            code: true,
+            name: true,
+            credits: true,
+            type: true,
+            description: true,
+            semester: {
+                select: {
+                    id: true,
+                    number: true,
+                    academicYear: {
+                        select: {
+                            year: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: [
+            { semester: { academicYear: { year: "asc" } } },
+            { semester: { number: "asc" } },
+            { name: "asc" },
+        ],
+    })
+
     // Fetch students from home department
     const students = await prisma.studentProfile.findMany({
         where: {
@@ -94,9 +127,23 @@ export default async function MDCConfigurationPage({
         },
     })
 
-    // Fetch faculty for assignment dropdown
+    // Fetch ALL MDC assignments for home department (to check for existing enrollments)
+    const allMDCAssignments = await prisma.mDCCourse.findMany({
+        where: {
+            homeDepartmentId: homeDeptId,
+        },
+        select: {
+            studentIds: true,
+            semester: true,
+            courseName: true,
+            id: true,
+        },
+    })
+
+    // Fetch faculty for assignment dropdown - from MDC department only
     const faculty = await prisma.facultyProfile.findMany({
         where: {
+            departmentId: mdcDeptId,  // Faculty must be from MDC course-offering department
             user: { isActive: true, deletedAt: null },
         },
         select: {
@@ -130,6 +177,8 @@ export default async function MDCConfigurationPage({
                     mdcDepartment={mdcDepartment}
                     students={students}
                     existingCourses={existingCourses}
+                    allMDCAssignments={allMDCAssignments}
+                    availableMDCSubjects={availableMDCSubjects}
                     faculty={faculty}
                 />
             </div>

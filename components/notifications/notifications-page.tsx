@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Bell, Check, Filter, Trash, Search, Calendar, FileText, CheckCircle2, UserCheck } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { Bell, Check, Filter, Trash, Search, Calendar, FileText, CheckCircle2, UserCheck, ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +35,7 @@ import { toast } from "sonner"
 import { getMyNotifications, markAsRead, markAllAsRead, deleteNotification } from "@/actions/shared/notifications"
 import type { Notification } from "@prisma/client"
 import { formatDistanceToNow } from "date-fns"
+import { PushNotificationSettings } from "@/components/notifications/push-notification-settings"
 
 export function NotificationsPage() {
     const router = useRouter()
@@ -136,6 +137,17 @@ export function NotificationsPage() {
 
     return (
         <div className="container mx-auto max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Back to Dashboard Button */}
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="gap-2 text-foreground hover:bg-muted"
+            >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+            </Button>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
@@ -151,6 +163,9 @@ export function NotificationsPage() {
                     </Button>
                 </div>
             </div>
+
+            {/* Push Notification Settings */}
+            <PushNotificationSettings />
 
             <div className="flex flex-col md:flex-row gap-6">
 

@@ -5,7 +5,7 @@
 // ============================================================================
 // Client wrapper for interactive elements
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -20,6 +20,8 @@ import { MDCAttendanceSelector } from "@/components/faculty/mdc-placeholder"
 import { MDCAttendanceSheet } from "@/components/faculty/mdc-attendance-sheet"
 import { MarkAttendanceModal } from "@/components/faculty/mark-attendance-modal"
 import { useRouter } from "next/navigation"
+import { useLoading } from "@/contexts/loading-context"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 interface FacultyDashboardProps {
     data: {
@@ -53,12 +55,26 @@ interface FacultyDashboardProps {
             name: string
             semester: number
         }>
+        weeklyTimetable: Array<{
+            id: string
+            dayOfWeek: number
+            period: number
+            room: string | null
+            subject: {
+                name: string
+                code: string
+            }
+            semester: {
+                number: number
+            }
+        }>
     }
 }
 
 export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const router = useRouter()
+    const { forceFinishAll } = useLoading()
 
     // Attendance modal states
     const [isTypeModalOpen, setIsTypeModalOpen] = useState(false)
@@ -131,8 +147,13 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
         role: `${data.user.designation} - ${data.user.departmentName}`,
     }
 
+    // Force clear any stuck loading states when dashboard mounts
+    useEffect(() => {
+        forceFinishAll()
+    }, [])
+
     return (
-        <div className="min-h-screen bg-slate-900">
+        <div className="min-h-screen bg-background">
             <DashboardSidebar role="faculty" />
             <MobileSidebar role="faculty" open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
@@ -140,42 +161,45 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
                 <DashboardHeader title="Faculty Dashboard" user={user} onMenuClick={() => setSidebarOpen(true)} hideSearch={true} />
 
                 <main className="p-4 sm:p-6 space-y-6">
+                    {/* PWA Install Prompt */}
+                    <PwaInstallPrompt variant="banner" />
+
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <StatsCard
                             title="My Subjects"
                             value={String(data.stats.totalSubjects)}
                             description="Assigned courses"
                             icon={BookOpen}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Total Students"
                             value={String(data.stats.totalStudents)}
                             description="Across all subjects"
                             icon={Users}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Classes Today"
                             value={String(data.stats.classesToday)}
                             description={data.todayClasses[0]?.subjectName ? `Next: ${data.todayClasses[0].subjectName}` : "No classes"}
                             icon={Calendar}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                         <StatsCard
                             title="Attendance Marked"
                             value={String(data.stats.attendanceMarkedToday)}
                             description="Records today"
                             icon={ClipboardCheck}
-                            className="shadow-2xl bg-white border-slate-200"
+                            className="shadow-lg"
                         />
                     </div>
 
                     {/* Main Content */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Today's Classes */}
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-lg">
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -230,7 +254,7 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
                         </Card>
 
                         {/* Quick Actions */}
-                        <Card className="shadow-2xl bg-white border-slate-200">
+                        <Card className="shadow-lg">
                             <CardHeader>
                                 <CardTitle>Quick Actions</CardTitle>
                                 <CardDescription>Frequently used tasks</CardDescription>
@@ -268,8 +292,87 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
                         </Card>
                     </div>
 
+                    {/* Weekly Timetable */}
+                    <Card className="shadow-lg">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>My Weekly Timetable</CardTitle>
+                                    <CardDescription>Your schedule for the week</CardDescription>
+                                </div>
+                                <Link href="/dashboard/faculty/schedule">
+                                    <Button variant="ghost" size="sm" className="gap-2">
+                                        Full Schedule
+                                        <ArrowRight className="h-4 w-4" />
+                                    </Button>
+                                </Link>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="border-b">
+                                            <th className="p-1 sm:p-2 text-left text-[10px] sm:text-sm font-medium text-muted-foreground bg-muted/50">Day</th>
+                                            {[1, 2, 3, 4, 5].map(period => (
+                                                <th key={period} className="p-1 sm:p-2 text-center text-[10px] sm:text-sm font-medium text-muted-foreground bg-muted/50">
+                                                    <span className="hidden sm:inline">Period {period}</span>
+                                                    <span className="sm:hidden">P{period}</span>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[
+                                            { full: 'Monday', short: 'Mon' },
+                                            { full: 'Tuesday', short: 'Tue' },
+                                            { full: 'Wednesday', short: 'Wed' },
+                                            { full: 'Thursday', short: 'Thu' },
+                                            { full: 'Friday', short: 'Fri' },
+                                            { full: 'Saturday', short: 'Sat' }
+                                        ].map((day, dayIndex) => {
+                                            const dayOfWeek = dayIndex + 1
+                                            const dayClasses = data.weeklyTimetable.filter(t => t.dayOfWeek === dayOfWeek)
+
+                                            return (
+                                                <tr key={day.full} className="border-b hover:bg-muted/30 transition-colors">
+                                                    <td className="p-1 sm:p-2 font-medium text-[10px] sm:text-sm">
+                                                        <span className="hidden sm:inline">{day.full}</span>
+                                                        <span className="sm:hidden">{day.short}</span>
+                                                    </td>
+                                                    {[1, 2, 3, 4, 5].map(period => {
+                                                        const classInfo = dayClasses.find(c => c.period === period)
+
+                                                        return (
+                                                            <td key={period} className="p-0.5 sm:p-1">
+                                                                {classInfo ? (
+                                                                    <div className="p-1 sm:p-2 bg-primary/10 rounded border border-primary/20 text-[9px] sm:text-xs">
+                                                                        <div className="font-medium text-primary truncate leading-tight" title={classInfo.subject.name}>
+                                                                            {classInfo.subject.name}
+                                                                        </div>
+                                                                        <div className="text-primary/70 mt-0.5 leading-tight">{classInfo.subject.code}</div>
+                                                                        <div className="text-muted-foreground mt-0.5 leading-tight hidden sm:block">Sem {classInfo.semester.number}</div>
+                                                                        {classInfo.room && (
+                                                                            <div className="text-muted-foreground mt-0.5 leading-tight hidden sm:block">{classInfo.room}</div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="p-1 sm:p-2 text-center text-muted-foreground text-[9px] sm:text-xs">Free</div>
+                                                                )}
+                                                            </td>
+                                                        )
+                                                    })}
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* My Subjects */}
-                    <Card className="shadow-2xl bg-white border-slate-200">
+                    <Card className="shadow-lg">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>

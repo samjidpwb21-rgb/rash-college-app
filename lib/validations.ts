@@ -65,6 +65,7 @@ export const createSubjectSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters").max(100),
     credits: z.number().int().positive().max(10).default(3),
     type: z.enum(["THEORY", "PRACTICAL"]).default("THEORY"),
+    isMDC: z.boolean().default(false),  // MDC course flag
     description: z.string().max(500).optional(),
     departmentId: uuidSchema,
     semesterId: uuidSchema,

@@ -152,7 +152,7 @@ export function AdminFacultyTimetableClient({
                     <Button
                         variant="ghost"
                         onClick={() => router.push(`/dashboard/admin/departments/${department.id}`)}
-                        className="mb-2"
+                        className="mb-2 text-white hover:text-white"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Department
@@ -188,7 +188,7 @@ export function AdminFacultyTimetableClient({
 
                     {/* Faculty Stats */}
                     {selectedFaculty && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             <Card>
                                 <CardContent className="p-6">
                                     <div className="flex items-center gap-4">
@@ -252,15 +252,17 @@ export function AdminFacultyTimetableClient({
                                         <table className="w-full border-collapse">
                                             <thead>
                                                 <tr>
-                                                    <th className="border border-border bg-muted p-3 text-left font-semibold">
-                                                        Day / Period
+                                                    <th className="border border-border bg-muted p-0.5 sm:p-3 text-left font-semibold text-[7px] sm:text-sm">
+                                                        <span className="hidden sm:inline">Day / Period</span>
+                                                        <span className="sm:hidden">Day</span>
                                                     </th>
                                                     {PERIODS.map((period) => (
                                                         <th
                                                             key={period}
-                                                            className="border border-border bg-muted p-3 text-center font-semibold"
+                                                            className="border border-border bg-muted p-0.5 sm:p-3 text-center font-semibold text-[7px] sm:text-sm"
                                                         >
-                                                            Period {period}
+                                                            <span className="hidden sm:inline">Period {period}</span>
+                                                            <span className="sm:hidden">P{period}</span>
                                                         </th>
                                                     ))}
                                                 </tr>
@@ -268,37 +270,39 @@ export function AdminFacultyTimetableClient({
                                             <tbody>
                                                 {DAYS.map((day, dayIndex) => (
                                                     <tr key={day}>
-                                                        <td className="border border-border bg-muted p-3 font-semibold">
-                                                            {day}
+                                                        <td className="border border-border bg-muted p-0.5 sm:p-3 font-semibold text-[7px] sm:text-sm">
+                                                            <span className="hidden sm:inline">{day}</span>
+                                                            <span className="sm:hidden">{day.slice(0, 3)}</span>
                                                         </td>
                                                         {PERIODS.map((period) => {
                                                             const entry = getTimetableEntry(dayIndex + 1, period)
                                                             return (
                                                                 <td
                                                                     key={period}
-                                                                    className="border border-border p-2 align-top"
+                                                                    className="border border-border p-[2px] sm:p-2 align-top"
                                                                 >
                                                                     {entry ? (
                                                                         <div
-                                                                            className={`rounded-md p-3 min-h-[100px] ${entry.subjectColor}`}
+                                                                            className={`rounded-md p-0.5 sm:p-3 min-h-[50px] sm:min-h-[100px] ${entry.subjectColor}`}
                                                                         >
-                                                                            <div className="font-semibold text-sm mb-2">
+                                                                            <div className="font-semibold text-[6px] sm:text-sm mb-0.5 sm:mb-2 leading-tight">
                                                                                 {entry.subject.name}
                                                                             </div>
-                                                                            <div className="text-xs space-y-1">
-                                                                                <div className="flex items-center gap-1 flex-wrap">
-                                                                                    <Badge variant="outline" className="text-xs">
+                                                                            <div className="text-[5px] sm:text-xs space-y-0 sm:space-y-1">
+                                                                                <div className="flex items-center gap-0.5 sm:gap-1 flex-wrap">
+                                                                                    <Badge variant="outline" className="text-[5px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 bg-white/90 dark:bg-slate-800 dark:text-white dark:border-slate-600">
                                                                                         {entry.subject.code}
                                                                                     </Badge>
-                                                                                    <Badge variant="secondary" className="text-xs">
-                                                                                        Sem {entry.semester.number}
+                                                                                    <Badge variant="secondary" className="text-[5px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100">
+                                                                                        <span className="hidden sm:inline">Sem {entry.semester.number}</span>
+                                                                                        <span className="sm:hidden">S{entry.semester.number}</span>
                                                                                     </Badge>
                                                                                 </div>
-                                                                                {entry.room && <div>📍 {entry.room}</div>}
+                                                                                {entry.room && <div className="hidden sm:block">📍 {entry.room}</div>}
                                                                             </div>
                                                                         </div>
                                                                     ) : (
-                                                                        <div className="min-h-[100px] flex items-center justify-center text-muted-foreground text-sm">
+                                                                        <div className="min-h-[50px] sm:min-h-[100px] flex items-center justify-center text-muted-foreground text-[6px] sm:text-sm">
                                                                             Free
                                                                         </div>
                                                                     )}

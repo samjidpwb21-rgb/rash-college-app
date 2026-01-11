@@ -55,6 +55,7 @@
     "next": "16.1.1",
     "next-auth": "^4.24.13",
     "next-themes": "^0.4.6",
+    "nodemailer": "^7.0.12",
     "prisma": "^6.19.1",
     "react": "19.2.0",
     "react-day-picker": "latest",
@@ -67,12 +68,14 @@
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.0.3",
     "vaul": "latest",
+    "web-push": "^3.6.7",
     "zod": "3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",
+    "@types/nodemailer": "^7.0.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",

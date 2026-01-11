@@ -43,8 +43,8 @@ export async function createOrUpdateMDCCourse(
             return errorResponse("Year must be between 1 and 4")
         }
 
-        if (data.semester < 1 || data.semester > 2) {
-            return errorResponse("Semester must be 1 or 2")
+        if (data.semester < 1 || data.semester > 8) {
+            return errorResponse("Semester must be between 1 and 8")
         }
 
         if (data.studentIds.length === 0) {
@@ -120,6 +120,47 @@ export async function deleteMDCCourse(id: string): Promise<ActionResult<void>> {
     } catch (error) {
         console.error("Error deleting MDC course:", error)
         return errorResponse("Failed to delete MDC course")
+    }
+}
+
+// ============================================================================
+// UPDATE MDC COURSE FACULTY (From Timetable)
+// ============================================================================
+
+export async function updateMDCCourseFaculty(
+    departmentId: string,
+    semester: number,
+    facultyId: string
+): Promise<ActionResult<void>> {
+    try {
+        const session = await getSession()
+
+        if (!session?.user || session.user.role !== "ADMIN") {
+            return errorResponse("Unauthorized", "UNAUTHORIZED")
+        }
+
+        // Find MDC course where this department OFFERS the MDC
+        const mdcCourse = await prisma.mDCCourse.findFirst({
+            where: {
+                mdcDepartmentId: departmentId,  // The department that OFFERS this MDC
+                semester: semester,
+            },
+        })
+
+        if (!mdcCourse) {
+            return errorResponse("No MDC course found for this department and semester")
+        }
+
+        // Update the faculty assignment
+        await prisma.mDCCourse.update({
+            where: { id: mdcCourse.id },
+            data: { facultyId },
+        })
+
+        return successResponse(undefined)
+    } catch (error) {
+        console.error("Error updating MDC course faculty:", error)
+        return errorResponse("Failed to update MDC faculty")
     }
 }
 
@@ -271,5 +312,114 @@ export async function getMDCStudentsForAttendance(courseId: string): Promise<
     } catch (error) {
         console.error("Error fetching MDC students:", error)
         return errorResponse("Failed to fetch students")
+    }
+}
+
+// ============================================================================
+// GET MDC COURSE FOR TIMETABLE (Auto-fill)
+// ============================================================================
+
+export async function getMDCCourseForTimetable(
+    departmentId: string,
+    semester: number
+): Promise<
+    ActionResult<{
+        courseName: string
+        subjectId: string | null
+        facultyId: string | null
+        facultyName: string | null
+    } | null>
+> {
+    try {
+        const session = await getSession()
+
+        if (!session?.user || session.user.role !== "ADMIN") {
+            return errorResponse("Unauthorized", "UNAUTHORIZED")
+        }
+
+        // Get department info to build MDC course name
+        const department = await prisma.department.findUnique({
+            where: { id: departmentId },
+            select: { name: true, code: true },
+        })
+
+        if (!department) {
+            return errorResponse("Department not found")
+        }
+
+        // Find MDC subject that belongs to this department for this semester
+        // MDC subjects have isMDC: true flag set when created
+        const mdcSubject = await prisma.subject.findFirst({
+            where: {
+                departmentId: departmentId,
+                isMDC: true,
+                semester: {
+                    number: semester,
+                },
+            },
+            select: {
+                id: true,
+                name: true,
+            },
+        })
+
+        if (mdcSubject) {
+            // Found MDC subject for this department
+            // Check if there's a faculty already assigned via MDCCourse
+            const mdcCourse = await prisma.mDCCourse.findFirst({
+                where: {
+                    mdcDepartmentId: departmentId,
+                    semester: semester,
+                },
+                select: {
+                    facultyId: true,
+                    faculty: {
+                        select: {
+                            user: { select: { name: true } },
+                        },
+                    },
+                },
+            })
+
+            return successResponse({
+                courseName: mdcSubject.name,
+                subjectId: mdcSubject.id,
+                facultyId: mdcCourse?.facultyId || null,
+                facultyName: mdcCourse?.faculty?.user.name || null,
+            })
+        }
+
+        // Fallback: Look for any MDC course where this dept is the provider
+        const mdcCourse = await prisma.mDCCourse.findFirst({
+            where: {
+                mdcDepartmentId: departmentId,
+                semester: semester,
+            },
+            select: {
+                id: true,
+                courseName: true,
+                facultyId: true,
+                faculty: {
+                    select: {
+                        user: { select: { name: true } },
+                    },
+                },
+            },
+        })
+
+        if (mdcCourse) {
+            return successResponse({
+                courseName: mdcCourse.courseName,
+                subjectId: null,
+                facultyId: mdcCourse.facultyId,
+                facultyName: mdcCourse.faculty?.user.name || null,
+            })
+        }
+
+        // No MDC found - return null to indicate no MDC is configured
+        return successResponse(null)
+    } catch (error) {
+        console.error("Error fetching MDC course for timetable:", error)
+        return errorResponse("Failed to fetch MDC course")
     }
 }

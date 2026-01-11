@@ -29,6 +29,7 @@ import {
     Search,
     Mail,
     Network,
+    ChevronRight,
 } from "lucide-react"
 
 interface DepartmentDetailsProps {
@@ -126,7 +127,7 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                     <Button
                         variant="ghost"
                         onClick={() => router.push("/dashboard/admin/departments")}
-                        className="mb-2"
+                        className="mb-2 text-white hover:text-white"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Departments
@@ -153,7 +154,7 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                     </Card>
 
                     {/* Key Metrics - Interactive Cards (Stage 1) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         {/* Students Card - Clickable */}
                         <Card
                             className="cursor-pointer hover:border-primary/50 hover:shadow-lg transition-all duration-200"
@@ -163,11 +164,14 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                             }}
                         >
                             <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                                        <GraduationCap className="h-5 w-5 text-accent" />
+                                <CardTitle className="flex items-center justify-between text-lg">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                                            <GraduationCap className="h-5 w-5 text-accent" />
+                                        </div>
+                                        Students
                                     </div>
-                                    Students
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -185,11 +189,14 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                             }}
                         >
                             <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <div className="h-10 w-10 rounded-lg bg-chart-3/10 flex items-center justify-center">
-                                        <Users className="h-5 w-5 text-chart-3" />
+                                <CardTitle className="flex items-center justify-between text-lg">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-10 w-10 rounded-lg bg-chart-3/10 flex items-center justify-center">
+                                            <Users className="h-5 w-5 text-chart-3" />
+                                        </div>
+                                        Faculty
                                     </div>
-                                    Faculty
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -207,11 +214,14 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                             }}
                         >
                             <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <div className="h-10 w-10 rounded-lg bg-chart-4/10 flex items-center justify-center">
-                                        <BookOpen className="h-5 w-5 text-chart-4" />
+                                <CardTitle className="flex items-center justify-between text-lg">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-10 w-10 rounded-lg bg-chart-4/10 flex items-center justify-center">
+                                            <BookOpen className="h-5 w-5 text-chart-4" />
+                                        </div>
+                                        Courses
                                     </div>
-                                    Courses
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -229,11 +239,14 @@ export function AdminDepartmentDetailsClient({ department, user }: DepartmentDet
                             }}
                         >
                             <CardHeader className="pb-3">
-                                <CardTitle className="flex items-center gap-2 text-lg">
-                                    <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                                        <Network className="h-5 w-5 text-indigo-500" />
+                                <CardTitle className="flex items-center justify-between text-lg">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                            <Network className="h-5 w-5 text-indigo-500" />
+                                        </div>
+                                        MDC
                                     </div>
-                                    MDC
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>

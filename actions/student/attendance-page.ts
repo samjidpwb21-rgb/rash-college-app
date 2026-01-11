@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/db"
 import { getSession } from "@/lib/auth"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
+import { getPeriodTimeDisplay } from "@/lib/period-times"
 
 interface AttendancePageData {
     user: {
@@ -220,7 +221,7 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
             attendance.map(a => [`${a.subjectId}-${a.period}`, a.status])
         )
 
-        const periodTimes = ["09:30 - 10:20", "10:20 - 11:20", "11:30 - 12:30", "01:30 - 02:30", "02:30 - 03:30"]
+        // Period times use centralized utility with Friday support
 
         // Build 5 periods
         const periods: DailyAttendanceData["periods"] = Array.from({ length: 5 }, (_, i) => {
@@ -232,7 +233,7 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
                     period,
                     subject: "Free Period",
                     code: "",
-                    time: periodTimes[i],
+                    time: getPeriodTimeDisplay(dayOfWeek, period),
                     room: null,
                     faculty: "",
                     status: "not-applicable" as const,
@@ -246,7 +247,7 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
                 period,
                 subject: entry.subject.name,
                 code: entry.subject.code,
-                time: periodTimes[i],
+                time: getPeriodTimeDisplay(dayOfWeek, period),
                 room: entry.room,
                 faculty: entry.faculty.user.name,
                 status: status as "PRESENT" | "ABSENT" | "not-marked",
@@ -305,13 +306,13 @@ export async function getRecentAttendanceRecords(
         })
 
         const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-        const periodTimes = ["09:30 AM", "10:20 AM", "11:30 AM", "01:30 PM", "02:30 PM"]
+        // Period times now use centralized utility
 
         return successResponse(records.map(r => ({
             date: r.date.toISOString().split("T")[0],
             day: dayNames[r.date.getDay()],
             subject: r.subject.name,
-            time: periodTimes[r.period - 1] || `Period ${r.period}`,
+            time: getPeriodTimeDisplay(r.date.getDay(), r.period),
             status: r.status,
         })))
     } catch (error) {

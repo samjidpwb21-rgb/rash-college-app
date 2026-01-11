@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { updatePreferences, type UserPreferencesData } from "@/actions/shared/preferences"
 import { Badge } from "@/components/ui/badge"
+import { SignOutDialog } from "@/components/ui/sign-out-dialog"
 
 interface SettingsPageProps {
     initialPreferences: UserPreferencesData
@@ -37,6 +38,7 @@ export function SettingsPage({
     const router = useRouter()
     const [prefs, setPrefs] = useState(initialPreferences)
     const [isLoading, setIsLoading] = useState(false)
+    const [showSignOutDialog, setShowSignOutDialog] = useState(false)
 
     // Sync theme with prefs on mount (optional - theme provider handles this usually)
     // But we want to ensure the DB state matches local state if needed
@@ -219,15 +221,15 @@ export function SettingsPage({
                 <Button
                     variant="destructive"
                     className="w-full md:w-auto"
-                    onClick={() => {
-                        // Assuming standard signout
-                        router.push("/api/auth/signout")
-                    }}
+                    onClick={() => setShowSignOutDialog(true)}
                 >
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out
                 </Button>
             </div>
+
+            {/* Sign Out Confirmation Dialog */}
+            <SignOutDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog} />
 
         </div>
     )

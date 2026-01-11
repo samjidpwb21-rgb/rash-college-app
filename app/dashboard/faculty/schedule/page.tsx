@@ -7,14 +7,10 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth-options"
 import { prisma } from "@/lib/db"
 import { FacultyScheduleClient } from "@/components/dashboard/faculty-schedule-client"
+import { getPeriodTimeDisplay } from "@/lib/period-times"
 
-const PERIOD_TIMES = [
-  "9:00 AM - 9:50 AM",
-  "10:00 AM - 10:50 AM",
-  "11:00 AM - 11:50 AM",
-  "12:00 PM - 12:50 PM",
-  "2:00 PM - 2:50 PM",
-]
+// Period timings are now centralized in lib/period-times.ts
+// Automatically handles different Friday schedule
 
 export default async function FacultySchedulePage() {
   // 1. Check authentication
@@ -85,7 +81,7 @@ export default async function FacultySchedulePage() {
     if (dayName) {
       timetable[dayName].push({
         period: entry.period,
-        time: PERIOD_TIMES[entry.period - 1] || `Period ${entry.period}`,
+        time: getPeriodTimeDisplay(entry.dayOfWeek, entry.period),
         subject: entry.subject.name,
         code: entry.subject.code,
         students: entry.semester?.students.length || 0,

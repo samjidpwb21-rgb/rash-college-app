@@ -100,6 +100,19 @@ export async function registerStudent(
             return errorResponse("Password must be at least 6 characters")
         }
 
+        // NEW: Verify OTP was confirmed for this email
+        const verifiedToken = await prisma.verificationToken.findFirst({
+            where: {
+                email: input.email.toLowerCase().trim(),
+                verified: true,
+                expiresAt: { gte: new Date() },
+            },
+        })
+
+        if (!verifiedToken) {
+            return errorResponse("Email verification required. Please verify your email first.")
+        }
+
         // 2. Check for duplicates
         const existingEmail = await prisma.user.findUnique({
             where: { email: input.email.toLowerCase().trim() },
@@ -144,6 +157,11 @@ export async function registerStudent(
             })
 
             return { userId: user.id }
+        })
+
+        // Delete the verification token after successful registration
+        await prisma.verificationToken.delete({
+            where: { id: verifiedToken.id },
         })
 
         return successResponse(result, "Registration successful! Please log in.")
@@ -193,6 +211,19 @@ export async function registerFaculty(
             return errorResponse("Password must be at least 6 characters")
         }
 
+        // NEW: Verify OTP was confirmed for this email
+        const verifiedToken = await prisma.verificationToken.findFirst({
+            where: {
+                email: input.email.toLowerCase().trim(),
+                verified: true,
+                expiresAt: { gte: new Date() },
+            },
+        })
+
+        if (!verifiedToken) {
+            return errorResponse("Email verification required. Please verify your email first.")
+        }
+
         // 2. Check for duplicates
         const existingEmail = await prisma.user.findUnique({
             where: { email: input.email.toLowerCase().trim() },
@@ -237,6 +268,11 @@ export async function registerFaculty(
             })
 
             return { userId: user.id }
+        })
+
+        // Delete the verification token after successful registration
+        await prisma.verificationToken.delete({
+            where: { id: verifiedToken.id },
         })
 
         return successResponse(result, "Registration successful! Please log in.")
@@ -286,6 +322,19 @@ export async function registerAdmin(
             return errorResponse("Password must be at least 6 characters")
         }
 
+        // NEW: Verify OTP was confirmed for this email
+        const verifiedToken = await prisma.verificationToken.findFirst({
+            where: {
+                email: input.email.toLowerCase().trim(),
+                verified: true,
+                expiresAt: { gte: new Date() },
+            },
+        })
+
+        if (!verifiedToken) {
+            return errorResponse("Email verification required. Please verify your email first.")
+        }
+
         // 2. Check for duplicate email
         const existingEmail = await prisma.user.findUnique({
             where: { email: input.email.toLowerCase().trim() },
@@ -307,6 +356,11 @@ export async function registerAdmin(
                 role: "ADMIN",
                 isActive: true,
             },
+        })
+
+        // Delete the verification token after successful registration
+        await prisma.verificationToken.delete({
+            where: { id: verifiedToken.id },
         })
 
         return successResponse({ userId: user.id }, "Registration successful! Please log in.")

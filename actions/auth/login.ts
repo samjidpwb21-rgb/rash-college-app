@@ -18,25 +18,19 @@ export interface LoginResult {
  * This action is for server-side validation and custom logic
  */
 export async function loginAction(
-    email: string,
+    identifier: string,
     password: string
 ): Promise<LoginResult> {
     // Basic validation
-    if (!email || !password) {
+    if (!identifier || !password) {
         return {
             success: false,
-            error: "Email and password are required",
+            error: "Email/ID and password are required",
         }
     }
 
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-        return {
-            success: false,
-            error: "Invalid email format",
-        }
-    }
+    // Identifier can be email OR student/faculty ID - no format validation needed
+    // The backend (NextAuth) will determine if it's an email or ID
 
     // Password minimum length
     if (password.length < 6) {

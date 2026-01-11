@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, EyeOff, GraduationCap, UserCog, Users } from "lucide-react"
+import { Eye, EyeOff, GraduationCap, Users } from "lucide-react"
+import { useLoading } from "@/contexts/loading-context"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,18 +22,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const { startLoading, finishLoading } = useLoading()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
+    // Start global loading animation immediately (login should show loader right away)
+    const loaderId = startLoading("login-auth", { immediate: true })
+
     try {
       // Map UI tab to expected role
       const roleMap: Record<string, string> = {
         student: "STUDENT",
         faculty: "FACULTY",
-        admin: "ADMIN",
       }
       const expectedRole = roleMap[activeRole]
 
@@ -52,6 +57,7 @@ export default function LoginPage() {
           setError("Invalid email/ID or password")
         }
         setLoading(false)
+        finishLoading(loaderId)
         return
       }
 
@@ -59,6 +65,7 @@ export default function LoginPage() {
       // This ensures redirect is based on DB role, not UI tab selection
       const response = await fetch("/api/auth/session")
       const session = await response.json()
+
 
       if (session?.user?.role) {
         // Redirect based on ACTUAL role from database
@@ -69,29 +76,35 @@ export default function LoginPage() {
         }
 
         const redirectUrl = roleRoutes[session.user.role] || "/dashboard/student"
+
+        // Clear login loading state before redirect
+        // This prevents the loader from continuing to loop after dashboard loads
+        finishLoading(loaderId)
+
         router.push(redirectUrl)
         router.refresh()
       } else {
         // Fallback - should not happen if login succeeded
+        finishLoading(loaderId) // Clear loading state
         router.push("/dashboard/student")
         router.refresh()
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
       setLoading(false)
+      finishLoading(loaderId)
     }
   }
 
   const roles = [
     { id: "student", label: "Student", icon: GraduationCap },
     { id: "faculty", label: "Faculty", icon: Users },
-    { id: "admin", label: "Admin", icon: UserCog },
   ]
 
   return (
     <AuthLayout title="Welcome back" description="Sign in to access your dashboard">
       <Tabs value={activeRole} onValueChange={setActiveRole} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
           {roles.map((role) => (
             <TabsTrigger key={role.id} value={role.id} className="flex items-center gap-2">
               <role.icon className="h-4 w-4" />
@@ -136,7 +149,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={`password-${role.id}`}>Password</Label>
-                  <Link href="#" className="text-sm text-primary hover:underline">
+                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>
@@ -173,6 +186,11 @@ export default function LoginPage() {
           Register here
         </Link>
       </p>
+
+      {/* PWA Install Prompt */}
+      <div className="mt-8">
+        <PwaInstallPrompt variant="login-centered" />
+      </div>
     </AuthLayout>
   )
 }

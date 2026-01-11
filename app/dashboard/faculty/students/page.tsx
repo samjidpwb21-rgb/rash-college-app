@@ -1,7 +1,6 @@
 import { getFacultyStudentsPageData } from "@/actions/faculty/students"
 import { FacultyStudentsClient } from "@/components/dashboard/faculty-students-client"
-import { DashboardHeader } from "@/components/dashboard/header"
-import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { FacultyStudentsPageWrapper } from "@/components/dashboard/faculty-students-page-wrapper"
 import { getSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
@@ -20,16 +19,8 @@ export default async function StudentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <DashboardSidebar role="faculty" />
-
-      <div className="lg:ml-64">
-        <DashboardHeader title="Students" user={session.user} />
-
-        <main className="p-6">
-          <FacultyStudentsClient initialData={initialData} />
-        </main>
-      </div>
-    </div>
+    <FacultyStudentsPageWrapper user={session.user}>
+      <FacultyStudentsClient initialData={initialData} />
+    </FacultyStudentsPageWrapper>
   )
 }

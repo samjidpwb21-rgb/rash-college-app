@@ -52,36 +52,55 @@ export function MarkAttendanceModal({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const { toast } = useToast()
 
-    // Fetch students when modal opens
+    // Fetch students when modal opens or period changes
     useEffect(() => {
         if (open && subjectId) {
-            loadStudents()
+            loadStudentsWithAttendance()
         }
-    }, [open, subjectId])
+    }, [open, subjectId, period, date])
 
-    // Load existing attendance when date changes
-    useEffect(() => {
-        if (open && subjectId && students.length > 0) {
-            loadExistingAttendance()
-        }
-    }, [date])
-
-    const loadStudents = async () => {
+    const loadStudentsWithAttendance = async () => {
         setIsLoading(true)
         try {
-            const result = await getStudentsForAttendance(subjectId)
-            if (result.success) {
-                setStudents(result.data.map(s => ({
-                    ...s,
-                    status: "PRESENT" as const,
-                })))
-            } else {
+            // Step 1: Fetch students
+            const studentsResult = await getStudentsForAttendance(subjectId)
+            if (!studentsResult.success) {
                 toast({
                     title: "Error",
-                    description: result.error || "Failed to load students",
+                    description: studentsResult.error || "Failed to load students",
                     variant: "destructive",
                 })
+                return
             }
+
+            // Step 2: Fetch existing attendance for this specific period
+            const existingResult = await getExistingAttendance(subjectId, date.toISOString())
+
+            // Step 3: Merge data - preload existing attendance or default to PRESENT
+            const studentsWithStatus = studentsResult.data.map(student => {
+                let status: "PRESENT" | "ABSENT" = "PRESENT" // Default
+
+                if (existingResult.success && existingResult.data) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const existingData = existingResult.data as any
+                    const studentAttendance = existingData[student.id]
+
+                    if (studentAttendance) {
+                        // Check ONLY the specific period being marked
+                        const periodStatus = studentAttendance[period]
+                        if (periodStatus) {
+                            status = periodStatus as "PRESENT" | "ABSENT"
+                        }
+                    }
+                }
+
+                return {
+                    ...student,
+                    status,
+                }
+            })
+
+            setStudents(studentsWithStatus)
         } catch (error) {
             toast({
                 title: "Error",
@@ -90,34 +109,6 @@ export function MarkAttendanceModal({
             })
         } finally {
             setIsLoading(false)
-        }
-    }
-
-    const loadExistingAttendance = async () => {
-        try {
-            const result = await getExistingAttendance(subjectId, date.toISOString())
-            if (result.success && result.data) {
-                // Apply existing attendance to students
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const existingData = result.data as any
-                setStudents(prev => prev.map(s => {
-                    const studentAttendance = existingData[s.id]
-                    if (studentAttendance) {
-                        // Check all periods 1-5 to find existing status (all marked with same status)
-                        const existingStatus = studentAttendance[1] ||
-                            studentAttendance[2] ||
-                            studentAttendance[3] ||
-                            studentAttendance[4] ||
-                            studentAttendance[5]
-                        if (existingStatus) {
-                            return { ...s, status: existingStatus as "PRESENT" | "ABSENT" }
-                        }
-                    }
-                    return s
-                }))
-            }
-        } catch {
-            // Silent fail - use default PRESENT
         }
     }
 
@@ -215,7 +206,7 @@ export function MarkAttendanceModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogContent className="max-w-7xl lg:max-h-[90vh] h-full lg:h-auto overflow-hidden flex flex-col">
                 <DialogHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -315,7 +306,7 @@ export function MarkAttendanceModal({
                                         <div className="col-span-4 text-center">Status</div>
                                     </div>
                                 </div>
-                                <div className="max-h-64 overflow-y-auto">
+                                <div>
                                     {students.map((student) => (
                                         <div
                                             key={student.id}

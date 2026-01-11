@@ -19,6 +19,7 @@ import { Search, Plus, Download, MoreHorizontal, BookOpen, Edit, Trash2, Users, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "@/hooks/use-toast"
 import { createSubject, updateSubject, deleteSubject } from "@/actions/admin/subjects"
 import { exportToCSV, getTimestampedFilename } from "@/lib/csv-export"
@@ -73,8 +74,8 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
     // Form state
     const [formCode, setFormCode] = useState("")
     const [formName, setFormName] = useState("")
-    const [formCredits, setFormCredits] = useState(3)
     const [formType, setFormType] = useState<"THEORY" | "PRACTICAL">("THEORY")
+    const [formIsMDC, setFormIsMDC] = useState(false)
     const [formDescription, setFormDescription] = useState("")
     const [formDepartmentId, setFormDepartmentId] = useState("")
     const [formSemesterId, setFormSemesterId] = useState("")
@@ -100,8 +101,8 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
     const resetForm = () => {
         setFormCode("")
         setFormName("")
-        setFormCredits(3)
         setFormType("THEORY")
+        setFormIsMDC(false)
         setFormDescription("")
         setFormDepartmentId("")
         setFormSemesterId("")
@@ -112,7 +113,6 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
         setSelectedSubject(subject)
         setFormCode(subject.code)
         setFormName(subject.name)
-        setFormCredits(subject.credits)
         setFormType(subject.type.toUpperCase() as "THEORY" | "PRACTICAL")
         setFormDescription(subject.description || "")
         setIsEditModalOpen(true)
@@ -136,8 +136,8 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
             const result = await createSubject({
                 code: formCode,
                 name: formName,
-                credits: formCredits,
                 type: formType,
+                isMDC: formIsMDC,
                 description: formDescription || undefined,
                 departmentId: formDepartmentId,
                 semesterId: formSemesterId,
@@ -171,7 +171,6 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                 id: selectedSubject.id,
                 code: formCode,
                 name: formName,
-                credits: formCredits,
                 type: formType,
                 description: formDescription || undefined,
             })
@@ -434,27 +433,14 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                         <DialogDescription>Create a new academic course/subject.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="add-code">Course Code</Label>
-                                <Input
-                                    id="add-code"
-                                    placeholder="CS101"
-                                    value={formCode}
-                                    onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="add-credits">Credits</Label>
-                                <Input
-                                    id="add-credits"
-                                    type="number"
-                                    min={1}
-                                    max={6}
-                                    value={formCredits}
-                                    onChange={(e) => setFormCredits(parseInt(e.target.value) || 3)}
-                                />
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-code">Course Code</Label>
+                            <Input
+                                id="add-code"
+                                placeholder="CS101"
+                                value={formCode}
+                                onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="add-name">Course Name</Label>
@@ -507,6 +493,19 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="add-mdc" className="text-base">Multi-Disciplinary Course (MDC)</Label>
+                                <p className="text-sm text-muted-foreground">
+                                    Enable for courses offered to students from other departments
+                                </p>
+                            </div>
+                            <Switch
+                                id="add-mdc"
+                                checked={formIsMDC}
+                                onCheckedChange={setFormIsMDC}
+                            />
+                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="add-description">Description (Optional)</Label>
                             <Textarea
@@ -538,27 +537,14 @@ export function AdminCoursesClient({ subjects: initialSubjects, departments, sem
                         <DialogDescription>Update course information.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-code">Course Code</Label>
-                                <Input
-                                    id="edit-code"
-                                    placeholder="CS101"
-                                    value={formCode}
-                                    onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-credits">Credits</Label>
-                                <Input
-                                    id="edit-credits"
-                                    type="number"
-                                    min={1}
-                                    max={6}
-                                    value={formCredits}
-                                    onChange={(e) => setFormCredits(parseInt(e.target.value) || 3)}
-                                />
-                            </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-code">Course Code</Label>
+                            <Input
+                                id="edit-code"
+                                placeholder="CS101"
+                                value={formCode}
+                                onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="edit-name">Course Name</Label>

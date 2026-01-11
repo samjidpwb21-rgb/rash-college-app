@@ -1,9 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import {
   BookOpen,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { SignOutDialog } from "@/components/ui/sign-out-dialog"
 
 type UserRole = "student" | "faculty" | "admin"
 
@@ -66,7 +67,7 @@ const roleLabels = {
   admin: "Admin Portal",
 }
 
-function SidebarContent({ role, onItemClick }: { role: UserRole; onItemClick?: () => void }) {
+function SidebarContent({ role, onItemClick, onSignOutClick }: { role: UserRole; onItemClick?: () => void; onSignOutClick?: () => void }) {
   const pathname = usePathname()
   const items = menuItems[role]
 
@@ -143,7 +144,7 @@ function SidebarContent({ role, onItemClick }: { role: UserRole; onItemClick?: (
           className="w-full justify-start gap-3 px-3 py-2.5 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
           onClick={() => {
             onItemClick?.()
-            signOut({ callbackUrl: '/login' })
+            onSignOutClick?.()
           }}
         >
           <LogOut className="h-5 w-5" />
@@ -155,19 +156,33 @@ function SidebarContent({ role, onItemClick }: { role: UserRole; onItemClick?: (
 }
 
 export function MobileSidebar({ role, open, onOpenChange }: SidebarProps) {
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false)
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-        <SidebarContent role={role} onItemClick={() => onOpenChange?.(false)} />
-      </SheetContent>
-    </Sheet>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
+          <SidebarContent
+            role={role}
+            onItemClick={() => onOpenChange?.(false)}
+            onSignOutClick={() => setShowSignOutDialog(true)}
+          />
+        </SheetContent>
+      </Sheet>
+      <SignOutDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog} />
+    </>
   )
 }
 
 export function DashboardSidebar({ role }: SidebarProps) {
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false)
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-sidebar-border flex-col hidden lg:flex">
-      <SidebarContent role={role} />
-    </aside>
+    <>
+      <aside className="fixed left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-sidebar-border flex-col hidden lg:flex">
+        <SidebarContent role={role} onSignOutClick={() => setShowSignOutDialog(true)} />
+      </aside>
+      <SignOutDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog} />
+    </>
   )
 }

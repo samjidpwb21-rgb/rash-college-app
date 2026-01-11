@@ -39,9 +39,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { ArrowLeft, Plus, Edit, Trash2, Loader2 } from "lucide-react"
 import { getDepartmentSemesterTimetable, createTimetableEntry, updateTimetableEntry, deleteTimetableEntry, getDepartmentSubjects, getDepartmentFaculty } from "@/actions/admin/timetable"
+import { getMDCCourseForTimetable, updateMDCCourseFaculty } from "@/actions/admin/mdc"
 
 interface TimetableEntry {
     id: string
@@ -115,6 +117,16 @@ export function AdminDepartmentTimetableClient({
         room: "",
     })
 
+    // MDC toggle state
+    const [isMDCPeriod, setIsMDCPeriod] = useState(false)
+    const [mdcData, setMdcData] = useState<{
+        courseName: string
+        subjectId: string | null
+        facultyId: string | null
+        facultyName: string | null
+    } | null>(null)
+    const [loadingMDC, setLoadingMDC] = useState(false)
+
     // Load timetable when semester changes
     useEffect(() => {
         if (selectedSemester && currentAcademicYear) {
@@ -169,6 +181,8 @@ export function AdminDepartmentTimetableClient({
         setSelectedSlot({ day, period })
         setSelectedEntry(null)
         setFormData({ subjectId: "", facultyId: "", room: "" })
+        setIsMDCPeriod(false)
+        setMdcData(null)
         setIsDialogOpen(true)
     }
 
@@ -180,12 +194,57 @@ export function AdminDepartmentTimetableClient({
             facultyId: entry.faculty.id,
             room: entry.room || "",
         })
+        setIsMDCPeriod(false)
+        setMdcData(null)
         setIsDialogOpen(true)
     }
 
     const handleDeletePeriod = (entry: TimetableEntry) => {
         setEntryToDelete(entry)
         setDeleteDialogOpen(true)
+    }
+
+    // Handle MDC toggle change
+    const handleMDCToggle = async (checked: boolean) => {
+        setIsMDCPeriod(checked)
+
+        if (checked) {
+            // Get semester number from selected semester
+            const selectedSem = semesters.find(s => s.id === selectedSemester)
+            if (!selectedSem) return
+
+            setLoadingMDC(true)
+            try {
+                const result = await getMDCCourseForTimetable(department.id, selectedSem.number)
+                if (result.success && result.data) {
+                    setMdcData(result.data)
+                    // Auto-fill form if subject and faculty are available
+                    if (result.data.subjectId && result.data.facultyId) {
+                        setFormData(prev => ({
+                            ...prev,
+                            subjectId: result.data!.subjectId!,
+                            facultyId: result.data!.facultyId!,
+                        }))
+                    }
+                } else {
+                    setMdcData(null)
+                    toast({
+                        title: "No MDC Configuration",
+                        description: "No MDC course is configured for this semester",
+                        variant: "destructive",
+                    })
+                    setIsMDCPeriod(false)
+                }
+            } catch (error) {
+                console.error("Error fetching MDC:", error)
+                setIsMDCPeriod(false)
+            } finally {
+                setLoadingMDC(false)
+            }
+        } else {
+            setMdcData(null)
+            setFormData({ subjectId: "", facultyId: "", room: formData.room })
+        }
     }
 
     const confirmDelete = async () => {
@@ -224,10 +283,16 @@ export function AdminDepartmentTimetableClient({
     const handleSavePeriod = async () => {
         if (!selectedSlot || !currentAcademicYear) return
 
-        if (!formData.subjectId || !formData.facultyId) {
+        // Validate: for MDC periods, use MDC data; for normal, require manual selection
+        const subjectId = isMDCPeriod && mdcData?.subjectId ? mdcData.subjectId : formData.subjectId
+        const facultyId = isMDCPeriod && mdcData?.facultyId ? mdcData.facultyId : formData.facultyId
+
+        if (!subjectId || !facultyId) {
             toast({
                 title: "Validation Error",
-                description: "Please select both subject and faculty",
+                description: isMDCPeriod
+                    ? "MDC course is not properly configured (missing subject or faculty)"
+                    : "Please select both subject and faculty",
                 variant: "destructive",
             })
             return
@@ -238,8 +303,8 @@ export function AdminDepartmentTimetableClient({
             const data = {
                 dayOfWeek: selectedSlot.day,
                 period: selectedSlot.period,
-                subjectId: formData.subjectId,
-                facultyId: formData.facultyId,
+                subjectId: subjectId,
+                facultyId: facultyId,
                 room: formData.room,
                 departmentId: department.id,
                 semesterId: selectedSemester,
@@ -254,6 +319,14 @@ export function AdminDepartmentTimetableClient({
             }
 
             if (result.success) {
+                // If MDC period, also update the MDC course faculty assignment
+                if (isMDCPeriod && facultyId) {
+                    const selectedSem = semesters.find(s => s.id === selectedSemester)
+                    if (selectedSem) {
+                        await updateMDCCourseFaculty(department.id, selectedSem.number, facultyId)
+                    }
+                }
+
                 toast({
                     title: "Success",
                     description: selectedEntry ? "Period updated successfully" : "Period added successfully",
@@ -287,7 +360,7 @@ export function AdminDepartmentTimetableClient({
                     <Button
                         variant="ghost"
                         onClick={() => router.push(`/dashboard/admin/departments/${department.id}`)}
-                        className="mb-2"
+                        className="mb-2 text-white hover:text-white"
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back to Department
@@ -334,15 +407,17 @@ export function AdminDepartmentTimetableClient({
                                     <table className="w-full border-collapse">
                                         <thead>
                                             <tr>
-                                                <th className="border border-border bg-muted p-3 text-left font-semibold">
-                                                    Day / Period
+                                                <th className="border border-border bg-muted p-0.5 sm:p-3 text-left font-semibold text-[7px] sm:text-sm">
+                                                    <span className="hidden sm:inline">Day / Period</span>
+                                                    <span className="sm:hidden">Day</span>
                                                 </th>
                                                 {PERIODS.map((period) => (
                                                     <th
                                                         key={period}
-                                                        className="border border-border bg-muted p-3 text-center font-semibold"
+                                                        className="border border-border bg-muted p-0.5 sm:p-3 text-center font-semibold text-[7px] sm:text-sm"
                                                     >
-                                                        Period {period}
+                                                        <span className="hidden sm:inline">Period {period}</span>
+                                                        <span className="sm:hidden">P{period}</span>
                                                     </th>
                                                 ))}
                                             </tr>
@@ -350,62 +425,64 @@ export function AdminDepartmentTimetableClient({
                                         <tbody>
                                             {DAYS.map((day, dayIndex) => (
                                                 <tr key={day}>
-                                                    <td className="border border-border bg-muted p-3 font-semibold">
-                                                        {day}
+                                                    <td className="border border-border bg-muted p-0.5 sm:p-3 font-semibold text-[7px] sm:text-sm">
+                                                        <span className="hidden sm:inline">{day}</span>
+                                                        <span className="sm:hidden">{day.slice(0, 3)}</span>
                                                     </td>
                                                     {PERIODS.map((period) => {
                                                         const entry = getTimetableEntry(dayIndex + 1, period)
                                                         return (
                                                             <td
                                                                 key={period}
-                                                                className="border border-border p-2 align-top"
+                                                                className="border border-border p-[2px] sm:p-2 align-top"
                                                             >
                                                                 {entry ? (
                                                                     <div
-                                                                        className={`rounded-md p-3 min-h-[100px] ${entry.subjectColor}`}
+                                                                        className={`rounded-md p-0.5 sm:p-3 min-h-[50px] sm:min-h-[100px] ${entry.subjectColor}`}
                                                                     >
-                                                                        <div className="flex items-start justify-between mb-2">
-                                                                            <div className="font-semibold text-sm">
+                                                                        <div className="flex items-start justify-between mb-0.5 sm:mb-2">
+                                                                            <div className="font-semibold text-[6px] sm:text-sm leading-tight">
                                                                                 {entry.subject.name}
                                                                             </div>
-                                                                            <div className="flex gap-1">
+                                                                            <div className="flex gap-0.5">
                                                                                 <Button
                                                                                     size="sm"
                                                                                     variant="ghost"
-                                                                                    className="h-6 w-6 p-0"
+                                                                                    className="h-4 w-4 sm:h-6 sm:w-6 p-0"
                                                                                     onClick={() => handleEditPeriod(entry)}
                                                                                 >
-                                                                                    <Edit className="h-3 w-3" />
+                                                                                    <Edit className="h-2 w-2 sm:h-3 sm:w-3" />
                                                                                 </Button>
                                                                                 <Button
                                                                                     size="sm"
                                                                                     variant="ghost"
-                                                                                    className="h-6 w-6 p-0"
+                                                                                    className="h-4 w-4 sm:h-6 sm:w-6 p-0"
                                                                                     onClick={() => handleDeletePeriod(entry)}
                                                                                 >
-                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                    <Trash2 className="h-2 w-2 sm:h-3 sm:w-3" />
                                                                                 </Button>
                                                                             </div>
                                                                         </div>
-                                                                        <div className="text-xs space-y-1">
-                                                                            <div className="flex items-center gap-1">
-                                                                                <Badge variant="outline" className="text-xs">
+                                                                        <div className="text-[5px] sm:text-xs space-y-0 sm:space-y-1">
+                                                                            <div className="flex items-center gap-0.5">
+                                                                                <Badge variant="outline" className="text-[5px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 bg-white/90 dark:bg-slate-800 dark:text-white dark:border-slate-600">
                                                                                     {entry.subject.code}
                                                                                 </Badge>
                                                                             </div>
-                                                                            <div>{entry.faculty.user.name}</div>
-                                                                            {entry.room && <div>📍 {entry.room}</div>}
+                                                                            <div className="hidden sm:block">{entry.faculty.user.name}</div>
+                                                                            {entry.room && <div className="hidden sm:block">📍 {entry.room}</div>}
                                                                         </div>
                                                                     </div>
                                                                 ) : (
-                                                                    <div className="min-h-[100px] flex items-center justify-center">
+                                                                    <div className="min-h-[50px] sm:min-h-[100px] flex items-center justify-center">
                                                                         <Button
                                                                             size="sm"
                                                                             variant="outline"
                                                                             onClick={() => handleAddPeriod(dayIndex + 1, period)}
+                                                                            className="text-[6px] sm:text-sm px-0.5 sm:px-3 py-0.5 sm:py-2"
                                                                         >
-                                                                            <Plus className="h-4 w-4 mr-1" />
-                                                                            Add
+                                                                            <Plus className="h-2.5 w-2.5 sm:h-4 sm:w-4 sm:mr-1" />
+                                                                            <span className="hidden sm:inline">Add</span>
                                                                         </Button>
                                                                     </div>
                                                                 )}
@@ -436,14 +513,46 @@ export function AdminDepartmentTimetableClient({
                     </DialogHeader>
 
                     <div className="space-y-4">
+                        {/* MDC Toggle - Only for Add, not Edit */}
+                        {!selectedEntry && (
+                            <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="mdc-toggle" className="text-sm font-medium">
+                                        MDC Period
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Auto-fill with configured MDC subject & faculty
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="mdc-toggle"
+                                    checked={isMDCPeriod}
+                                    onCheckedChange={handleMDCToggle}
+                                    disabled={loadingMDC}
+                                />
+                            </div>
+                        )}
+
+                        {/* MDC Auto-filled info */}
+                        {isMDCPeriod && mdcData && (
+                            <div className="p-3 border border-blue-500/50 rounded-lg bg-blue-500/10 space-y-2">
+                                <p className="text-sm font-medium text-blue-400">MDC Configuration</p>
+                                <div className="text-xs space-y-1">
+                                    <p><span className="text-muted-foreground">Course:</span> {mdcData.courseName}</p>
+                                    <p className="text-muted-foreground italic">Subject auto-filled • Select faculty below</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <Label htmlFor="subject">Subject *</Label>
                             <Select
                                 value={formData.subjectId}
                                 onValueChange={(value) => setFormData({ ...formData, subjectId: value })}
+                                disabled={isMDCPeriod && !!mdcData}
                             >
                                 <SelectTrigger id="subject">
-                                    <SelectValue placeholder="Select subject" />
+                                    <SelectValue placeholder={isMDCPeriod ? "Auto-filled from MDC" : "Select subject"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {subjects.map((subject) => (
@@ -456,7 +565,7 @@ export function AdminDepartmentTimetableClient({
                         </div>
 
                         <div>
-                            <Label htmlFor="faculty">Faculty *</Label>
+                            <Label htmlFor="faculty">Faculty * {isMDCPeriod && <span className="text-xs text-muted-foreground">(Required for MDC)</span>}</Label>
                             <Select
                                 value={formData.facultyId}
                                 onValueChange={(value) => setFormData({ ...formData, facultyId: value })}

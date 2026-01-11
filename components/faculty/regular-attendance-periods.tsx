@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Users, MapPin, BookOpen, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { isWithinPeriodWindow, getPeriodTimeDisplay } from "@/lib/period-times"
 
 interface TodayClass {
     period: number
@@ -31,45 +32,8 @@ interface RegularAttendancePeriodsProps {
     onSelectPeriod: (period: TodayClass) => void
 }
 
-// Time window configuration (in hours and minutes)
-const PERIOD_TIMES = {
-    1: { start: { h: 8, m: 45 }, end: { h: 10, m: 15 } },
-    2: { start: { h: 9, m: 45 }, end: { h: 11, m: 15 } },
-    3: { start: { h: 11, m: 15 }, end: { h: 12, m: 45 } },
-    4: { start: { h: 13, m: 45 }, end: { h: 15, m: 15 } },
-    5: { start: { h: 14, m: 45 }, end: { h: 16, m: 15 } },
-} as const
-
-function isWithinTimeWindow(period: number): { allowed: boolean; message: string } {
-    const now = new Date()
-    const currentHour = now.getHours()
-    const currentMinute = now.getMinutes()
-    const currentTimeInMinutes = currentHour * 60 + currentMinute
-
-    const periodTime = PERIOD_TIMES[period as keyof typeof PERIOD_TIMES]
-    if (!periodTime) {
-        return { allowed: false, message: "Invalid period" }
-    }
-
-    const startTimeInMinutes = periodTime.start.h * 60 + periodTime.start.m
-    const endTimeInMinutes = periodTime.end.h * 60 + periodTime.end.m
-
-    if (currentTimeInMinutes < startTimeInMinutes) {
-        const minutesUntilStart = startTimeInMinutes - currentTimeInMinutes
-        const hoursUntil = Math.floor(minutesUntilStart / 60)
-        const minsUntil = minutesUntilStart % 60
-        return {
-            allowed: false,
-            message: `Opens in ${hoursUntil}h ${minsUntil}m`
-        }
-    }
-
-    if (currentTimeInMinutes > endTimeInMinutes) {
-        return { allowed: false, message: "Time window closed" }
-    }
-
-    return { allowed: true, message: "Mark now" }
-}
+// Time window validation now uses centralized period-times utility
+// Automatically handles different Friday schedule
 
 export function RegularAttendancePeriods({
     open,
@@ -98,14 +62,17 @@ export function RegularAttendancePeriods({
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {todayClasses.map((cls) => {
-                                const timeWindow = isWithinTimeWindow(cls.period)
+                                // Get current day of week (1=Monday, 5=Friday)
+                                const today = new Date().getDay()
+                                const dayOfWeek = today === 0 ? 7 : today // Convert Sunday=0 to 7
+                                const timeWindow = isWithinPeriodWindow(dayOfWeek, cls.period)
 
                                 return (
                                     <Card
                                         key={`${cls.subjectId}-${cls.period}`}
                                         className={`relative ${timeWindow.allowed
-                                                ? "border-primary/50 bg-primary/5"
-                                                : "opacity-70"
+                                            ? "border-primary/50 bg-primary/5"
+                                            : "opacity-70"
                                             }`}
                                     >
                                         <CardContent className="p-5">

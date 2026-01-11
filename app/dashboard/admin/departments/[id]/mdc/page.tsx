@@ -52,6 +52,9 @@ export default async function MDCDepartmentSelectorPage({ params }: { params: Pr
         },
     })
 
+    // Filter out the home department - students can't take MDC from their own department
+    const mdcDepartments = allDepartments.filter(dept => dept.id !== homeDeptId)
+
     const user = {
         name: session.user.name || "Admin User",
         email: session.user.email || "admin@university.edu",
@@ -65,7 +68,7 @@ export default async function MDCDepartmentSelectorPage({ params }: { params: Pr
                 <DashboardHeader title="MDC Configuration" user={user} />
                 <MDCDepartmentSelector
                     homeDepartment={homeDepartment}
-                    departments={allDepartments}
+                    departments={mdcDepartments}
                 />
             </div>
         </div>

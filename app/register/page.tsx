@@ -11,10 +11,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, GraduationCap, UserCog, Users } from "lucide-react"
+import { Eye, EyeOff, GraduationCap, UserCog, Users, Mail, Check } from "lucide-react"
 import { getPublicDepartments } from "@/actions/auth/register"
 import { getPublicSemesters } from "@/actions/shared/public"
 import { registerStudent, registerFaculty, registerAdmin } from "@/actions/auth/register"
+import { sendOTP, verifyOTP, resendOTP } from "@/actions/auth/otp"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
+import type { ActionResult } from "@/types/api"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -22,9 +25,18 @@ export default function RegisterPage() {
   const [activeRole, setActiveRole] = useState("student")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [emailError, setEmailError] = useState("")
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([])
   const [semesters, setSemesters] = useState<Array<{ id: string; name: string; number: number }>>([])
   const [loadingData, setLoadingData] = useState(true)
+
+  // OTP verification states
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpValue, setOtpValue] = useState("")
+  const [otpVerified, setOtpVerified] = useState(false)
+  const [otpError, setOtpError] = useState("")
+  const [sendingOtp, setSendingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -37,6 +49,106 @@ export default function RegisterPage() {
     employeeId: "",
     designation: "",
   })
+
+  // Email validation helper
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  // Handle email input change with validation
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value
+    setFormData({ ...formData, email: newEmail })
+
+    // Reset OTP state if email changes after OTP was sent
+    if (otpSent || otpVerified) {
+      setOtpSent(false)
+      setOtpVerified(false)
+      setOtpValue("")
+      setOtpError("")
+    }
+
+    // Validate email format in real-time
+    if (newEmail && !validateEmail(newEmail)) {
+      setEmailError("Please enter a valid email address (e.g., name@example.com)")
+    } else {
+      setEmailError("")
+    }
+  }
+
+  // Send OTP to email
+  const handleSendOTP = async () => {
+    if (!validateEmail(formData.email)) {
+      setEmailError("Please enter a valid email address first")
+      return
+    }
+
+    setSendingOtp(true)
+    setOtpError("")
+
+    try {
+      const result = await sendOTP(formData.email)
+
+      if (result.success) {
+        setOtpSent(true)
+        setError("") // Clear any existing errors
+      } else {
+        setOtpError(result.error || "Failed to send verification code")
+      }
+    } catch (err) {
+      setOtpError("Failed to send verification code. Please try again.")
+    } finally {
+      setSendingOtp(false)
+    }
+  }
+
+  // Verify OTP
+  const handleVerifyOTP = async () => {
+    if (otpValue.length !== 6) {
+      setOtpError("Please enter the complete 6-digit code")
+      return
+    }
+
+    setVerifyingOtp(true)
+    setOtpError("")
+
+    try {
+      const result = await verifyOTP(formData.email, otpValue)
+
+      if (result.success) {
+        setOtpVerified(true)
+        setOtpError("")
+      } else {
+        setOtpError(result.error || "Invalid verification code")
+      }
+    } catch (err) {
+      setOtpError("Failed to verify code. Please try again.")
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
+  // Resend OTP
+  const handleResendOTP = async () => {
+    setSendingOtp(true)
+    setOtpError("")
+    setOtpValue("")
+
+    try {
+      const result = await resendOTP(formData.email)
+
+      if (result.success) {
+        setOtpError("") // Clear any previous errors
+      } else {
+        setOtpError(result.error || "Failed to resend verification code")
+      }
+    } catch (err) {
+      setOtpError("Failed to resend verification code. Please try again.")
+    } finally {
+      setSendingOtp(false)
+    }
+  }
 
   // Fetch departments and semesters on mount
   useEffect(() => {
@@ -72,6 +184,16 @@ export default function RegisterPage() {
       return false
     }
 
+    // Email format must be valid
+    if (!validateEmail(formData.email)) {
+      return false
+    }
+
+    // OTP must be verified
+    if (!otpVerified) {
+      return false
+    }
+
     // Password match
     if (formData.password !== formData.confirmPassword) {
       return false
@@ -103,6 +225,14 @@ export default function RegisterPage() {
       return
     }
 
+    // Validate email format
+    if (!validateEmail(formData.email)) {
+      setError("Please enter a valid email address")
+      setEmailError("Please enter a valid email address (e.g., name@example.com)")
+      setLoading(false)
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match")
       setLoading(false)
@@ -116,7 +246,7 @@ export default function RegisterPage() {
     }
 
     try {
-      let result
+      let result: ActionResult<{ userId: string }> | undefined
 
       if (activeRole === "student") {
         if (!formData.studentId || !formData.department || !formData.semester) {
@@ -148,13 +278,12 @@ export default function RegisterPage() {
           departmentId: formData.department,
           designation: formData.designation,
         })
-      } else {
-        // Admin
-        result = await registerAdmin({
-          fullName: formData.fullName,
-          email: formData.email,
-          password: formData.password,
-        })
+      }
+
+      if (!result) {
+        setError("Registration failed. Please try again.")
+        setLoading(false)
+        return
       }
 
       if (result.success) {
@@ -173,13 +302,12 @@ export default function RegisterPage() {
   const roles = [
     { id: "student", label: "Student", icon: GraduationCap },
     { id: "faculty", label: "Faculty", icon: Users },
-    { id: "admin", label: "Admin", icon: UserCog },
   ]
 
   return (
     <AuthLayout title="Create an account" description="Register to get started with R.A.S.H College App">
       <Tabs value={activeRole} onValueChange={setActiveRole} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
           {roles.map((role) => (
             <TabsTrigger key={role.id} value={role.id} className="flex items-center gap-2">
               <role.icon className="h-4 w-4" />
@@ -215,9 +343,104 @@ export default function RegisterPage() {
                   type="email"
                   placeholder="email@university.edu"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={handleEmailChange}
                   required
+                  className={emailError ? "border-destructive" : ""}
                 />
+                {emailError && (
+                  <p className="text-sm text-destructive">
+                    {emailError}
+                  </p>
+                )}
+              </div>
+
+              {/* OTP Verification Section */}
+              <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                {!otpSent && !otpVerified && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email Verification Required
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendOTP}
+                      disabled={!validateEmail(formData.email) || sendingOtp}
+                      className="w-full"
+                    >
+                      {sendingOtp ? "Sending code..." : "Send Verification Code"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      We'll send a 6-digit code to verify your email address
+                    </p>
+                  </div>
+                )}
+
+                {otpSent && !otpVerified && (
+                  <div className="space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Enter Verification Code
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      We've sent a 6-digit code to <strong>{formData.email}</strong>
+                    </p>
+
+                    <div className="flex justify-center">
+                      <InputOTP
+                        maxLength={6}
+                        value={otpValue}
+                        onChange={(value) => setOtpValue(value)}
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+
+                    {otpError && (
+                      <p className="text-sm text-destructive text-center">
+                        {otpError}
+                      </p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleVerifyOTP}
+                        disabled={otpValue.length !== 6 || verifyingOtp}
+                        className="flex-1"
+                      >
+                        {verifyingOtp ? "Verifying..." : "Verify Code"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleResendOTP}
+                        disabled={sendingOtp}
+                      >
+                        Resend
+                      </Button>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground text-center">
+                      Code expires in 10 minutes
+                    </p>
+                  </div>
+                )}
+
+                {otpVerified && (
+                  <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
+                    <Check className="h-5 w-5" />
+                    <span className="font-medium">Email verified successfully!</span>
+                  </div>
+                )}
               </div>
 
               {role.id === "student" && (

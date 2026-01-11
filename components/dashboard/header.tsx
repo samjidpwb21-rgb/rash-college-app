@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { signOut } from "next-auth/react"
 import { Bell, Menu, Search, X, LogOut, Settings, User } from "lucide-react"
+import { SignOutDialog } from "@/components/ui/sign-out-dialog"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +38,7 @@ export function DashboardHeader({ title, user, onMenuClick, hideSearch }: Dashbo
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false)
 
   // Determine role from path for navigation
   const roleSegment = pathname?.split('/')[2] || 'student'
@@ -217,7 +218,7 @@ export function DashboardHeader({ title, user, onMenuClick, hideSearch }: Dashbo
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive cursor-pointer"
-              onClick={() => signOut({ callbackUrl: '/login' })}
+              onClick={() => setShowSignOutDialog(true)}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
@@ -234,6 +235,9 @@ export function DashboardHeader({ title, user, onMenuClick, hideSearch }: Dashbo
           </div>
         </div>
       )}
+
+      {/* Sign Out Confirmation Dialog */}
+      <SignOutDialog open={showSignOutDialog} onOpenChange={setShowSignOutDialog} />
     </header>
   )
 }

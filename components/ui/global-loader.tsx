@@ -3,20 +3,19 @@
 // ============================================================================
 // CAMPUSTRACK - GLOBAL LOADING OVERLAY
 // ============================================================================
-// Instagram/LinkedIn-style loading overlay that appears during route transitions
+// Instagram/LinkedIn-style loading overlay with persistent Lottie animation
+// Uses global loading context for centralized state management
 
 import { useEffect, useState } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
 import Lottie from "lottie-react"
+import { useLoading } from "@/contexts/loading-context"
 
 export function GlobalLoader() {
-    const pathname = usePathname()
-    const searchParams = useSearchParams()
-    const [isLoading, setIsLoading] = useState(false)
+    const { isLoading } = useLoading()
     const [animationData, setAnimationData] = useState(null)
     const [showLoader, setShowLoader] = useState(false)
 
-    // Load Lottie animation
+    // Load Lottie animation once on mount
     useEffect(() => {
         fetch("/uploads/lottie/Sandy Loading.json")
             .then((res) => res.json())
@@ -24,54 +23,28 @@ export function GlobalLoader() {
             .catch((err) => console.error("Failed to load Lottie animation:", err))
     }, [])
 
-    // Track route changes
+    // Show/hide loader with smooth transition
     useEffect(() => {
-        let timeoutId: NodeJS.Timeout
-        let minDisplayTimeout: NodeJS.Timeout
-
         if (isLoading) {
-            // Show loader after a brief delay to prevent flicker on fast loads
-            timeoutId = setTimeout(() => {
-                setShowLoader(true)
-            }, 100)
+            // Show immediately when loading starts
+            setShowLoader(true)
         } else {
-            // Hide loader with smooth fade
-            if (showLoader) {
-                // Ensure minimum display time of 300ms to prevent flash
-                minDisplayTimeout = setTimeout(() => {
-                    setShowLoader(false)
-                }, 200)
-            } else {
+            // Wait for fade transition before unmounting
+            const timer = setTimeout(() => {
                 setShowLoader(false)
-            }
+            }, 200)
+            return () => clearTimeout(timer)
         }
+    }, [isLoading])
 
-        return () => {
-            clearTimeout(timeoutId)
-            clearTimeout(minDisplayTimeout)
-        }
-    }, [isLoading, showLoader])
-
-    // Detect navigation changes
-    useEffect(() => {
-        setIsLoading(true)
-
-        // Hide loader after navigation completes
-        const timer = setTimeout(() => {
-            setIsLoading(false)
-        }, 100)
-
-        return () => clearTimeout(timer)
-    }, [pathname, searchParams])
-
-    // Don't render if not showing
+    // Don't render if animation not loaded or not showing
     if (!showLoader || !animationData) {
         return null
     }
 
     return (
         <div
-            className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${showLoader ? "opacity-100" : "opacity-0 pointer-events-none"
+            className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isLoading ? "opacity-100" : "opacity-0 pointer-events-none"
                 }`}
             style={{
                 backgroundColor: "rgba(255, 255, 255, 0.2)",
