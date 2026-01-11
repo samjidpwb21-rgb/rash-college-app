@@ -5,7 +5,7 @@
 // ============================================================================ 
 // Server-side utilities for sending push notifications via Web Push API
 
-import webpush from 'web-push'
+import * as webpush from 'web-push'
 import { prisma } from '@/lib/db'
 
 // Configure web-push with VAPID keys
