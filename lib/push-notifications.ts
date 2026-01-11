@@ -133,6 +133,6 @@ export async function sendPushToUsers(
 /**
  * Test if push notifications are configured
  */
-export function isPushConfigured(): boolean {
+export async function isPushConfigured(): Promise<boolean> {
     return !!(vapidPublicKey && vapidPrivateKey)
 }
