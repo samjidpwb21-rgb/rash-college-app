@@ -91,11 +91,13 @@ export function ProfilePage({ initialData }: ProfilePageProps) {
 
             const result = await uploadProfilePicture(formData)
 
-            if (result.success) {
+            if (result.success && result.data) {
                 toast.success("Profile picture updated")
+                // Update preview with the saved URL (base64 from database)
+                setAvatarPreview(result.data.url)
                 router.refresh()
             } else {
-                toast.error(result.error || "Failed to upload image")
+                toast.error("error" in result ? result.error : "Failed to upload image")
                 // Revert preview on failure
                 setAvatarPreview(initialData.avatar)
             }

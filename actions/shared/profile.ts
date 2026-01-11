@@ -9,9 +9,7 @@ import { prisma } from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
 import { z } from "zod"
-import { writeFile, unlink } from "fs/promises"
-import { join } from "path"
-import { v4 as uuidv4 } from "uuid"
+// Note: Using base64 encoding for avatar storage (Vercel/Neon compatible)
 
 // Profile update schema
 const updateProfileSchema = z.object({
@@ -62,7 +60,7 @@ export async function getMyProfile(): Promise<ActionResult<ProfileData>> {
             name: user.name,
             email: user.email,
             role: user.role,
-            avatar: user.avatar,
+            avatar: user.avatar ?? null,
             id: user.id
         }
 
@@ -161,7 +159,7 @@ export async function updateMyProfile(
 }
 
 /**
- * Upload profile picture
+ * Upload profile picture (stores as base64 in database - Vercel/Neon compatible)
  */
 export async function uploadProfilePicture(formData: FormData): Promise<ActionResult<{ url: string }>> {
     try {
@@ -174,8 +172,9 @@ export async function uploadProfilePicture(formData: FormData): Promise<ActionRe
         const bytes = await file.arrayBuffer()
         const buffer = Buffer.from(bytes)
 
-        if (buffer.length > 5 * 1024 * 1024) {
-            return errorResponse("File size too large (max 5MB)")
+        // Max 2MB for base64 storage (reasonable limit for database storage)
+        if (buffer.length > 2 * 1024 * 1024) {
+            return errorResponse("File size too large (max 2MB)")
         }
 
         const validTypes = ["image/jpeg", "image/png", "image/webp"]
@@ -183,34 +182,17 @@ export async function uploadProfilePicture(formData: FormData): Promise<ActionRe
             return errorResponse("Invalid file type (JPG, PNG, WebP only)")
         }
 
-        // Generate filename
-        const ext = file.name.split(".").pop()
-        const filename = `${user.id}-${uuidv4()}.${ext}`
-        const publicPath = `/uploads/avatars/${filename}`
-        const systemPath = join(process.cwd(), "public", "uploads", "avatars", filename)
+        // Convert to base64 data URL
+        const base64 = buffer.toString("base64")
+        const dataUrl = `data:${file.type};base64,${base64}`
 
-        // Save file
-        await writeFile(systemPath, buffer)
-
-        // Update user record
-        // Optional: Delete old avatar if exists
-        if (user.avatar && user.avatar.startsWith("/uploads/avatars/")) {
-            try {
-                const oldFilename = user.avatar.split("/").pop()
-                if (oldFilename) {
-                    await unlink(join(process.cwd(), "public", "uploads", "avatars", oldFilename))
-                }
-            } catch (e) {
-                // Ignore delete error
-            }
-        }
-
+        // Update user record with base64 avatar
         await prisma.user.update({
             where: { id: user.id },
-            data: { avatar: publicPath }
+            data: { avatar: dataUrl }
         })
 
-        return successResponse({ url: publicPath })
+        return successResponse({ url: dataUrl })
     } catch (error) {
         console.error("Failed to upload avatar:", error)
         return errorResponse("Failed to upload image")
