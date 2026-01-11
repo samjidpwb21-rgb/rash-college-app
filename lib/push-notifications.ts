@@ -1,4 +1,5 @@
 "use server"
+export const runtime = 'nodejs'
 
 // ============================================================================
 // WEB PUSH NOTIFICATION UTILITIES
@@ -13,7 +14,7 @@ const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
 
 if (vapidPublicKey && vapidPrivateKey) {
-    webpush.setVAPIDDetails(
+    webpush.setVapidDetails(
         'mailto:admin@rash-college.edu', // Contact email
         vapidPublicKey,
         vapidPrivateKey
