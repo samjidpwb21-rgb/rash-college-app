@@ -162,11 +162,6 @@ export function AdminNoticesClient({ notices }: AdminNoticesClientProps) {
             return
         }
 
-        if (!formDepartmentId) {
-            toast({ title: "Validation Error", description: "Please select a department", variant: "destructive" })
-            return
-        }
-
         setIsLoading(true)
         let imageUrl: string | undefined
 
@@ -194,7 +189,7 @@ export function AdminNoticesClient({ notices }: AdminNoticesClientProps) {
                 title: formTitle,
                 content: formContent,
                 isImportant: formIsImportant,
-                departmentId: formDepartmentId,
+                departmentId: formDepartmentId === "ALL" || !formDepartmentId ? undefined : formDepartmentId,
                 type: formType,
                 imageUrl,
             })
@@ -470,12 +465,13 @@ export function AdminNoticesClient({ notices }: AdminNoticesClientProps) {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="add-department">Department *</Label>
+                            <Label htmlFor="add-department">Department (Optional)</Label>
                             <Select value={formDepartmentId} onValueChange={setFormDepartmentId}>
                                 <SelectTrigger id="add-department">
                                     <SelectValue placeholder="Select department" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="ALL">Campus Wide (All Departments)</SelectItem>
                                     {departments.map((dept) => (
                                         <SelectItem key={dept.id} value={dept.id}>
                                             {dept.name} ({dept.code})
