@@ -119,9 +119,9 @@ export function StudentAttendanceClient({ data }: StudentAttendanceProps) {
             <div className="lg:ml-64">
                 <DashboardHeader title="My Attendance" user={user} onMenuClick={() => setSidebarOpen(true)} hideSearch={true} />
 
-                <main className="p-6 space-y-6">
+                <main className="p-4 sm:p-6 space-y-6">
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                         <Card>
                             <CardContent className="p-6">
                                 <div className="flex items-center gap-4">
@@ -164,7 +164,7 @@ export function StudentAttendanceClient({ data }: StudentAttendanceProps) {
                     </div>
 
                     {/* Daily Attendance - 5 Period Viewer */}
-                    <Card className="shadow-2xl bg-white border-slate-200">
+                    <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>

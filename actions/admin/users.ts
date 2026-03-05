@@ -324,6 +324,7 @@ export async function getUsers(
         const users = await prisma.user.findMany({
             where,
             orderBy: { createdAt: "desc" },
+            take: 2000, // Defensive limit to prevent fetching unbounded user lists that could crash the server
             select: {
                 id: true,
                 email: true,

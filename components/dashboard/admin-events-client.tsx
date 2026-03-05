@@ -38,10 +38,9 @@ interface AdminEventsClientProps {
     events: EventData[]
 }
 
-export function AdminEventsClient({ events: initialEvents }: AdminEventsClientProps) {
+export function AdminEventsClient({ events }: AdminEventsClientProps) {
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const [events] = useState(initialEvents)
     const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const [searchQuery, setSearchQuery] = useState("")
 

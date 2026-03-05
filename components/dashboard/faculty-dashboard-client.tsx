@@ -20,7 +20,6 @@ import { MDCAttendanceSelector } from "@/components/faculty/mdc-placeholder"
 import { MDCAttendanceSheet } from "@/components/faculty/mdc-attendance-sheet"
 import { MarkAttendanceModal } from "@/components/faculty/mark-attendance-modal"
 import { useRouter } from "next/navigation"
-import { useLoading } from "@/contexts/loading-context"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 interface FacultyDashboardProps {
@@ -75,7 +74,6 @@ interface FacultyDashboardProps {
 export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const router = useRouter()
-    const { forceFinishAll } = useLoading()
 
     // Attendance modal states
     const [isTypeModalOpen, setIsTypeModalOpen] = useState(false)
@@ -149,10 +147,6 @@ export function FacultyDashboardClient({ data }: FacultyDashboardProps) {
         role: `${data.user.designation} - ${data.user.departmentName}`,
     }
 
-    // Force clear any stuck loading states when dashboard mounts
-    useEffect(() => {
-        forceFinishAll()
-    }, [])
 
     return (
         <div className="min-h-screen bg-background">

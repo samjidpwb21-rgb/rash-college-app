@@ -84,8 +84,8 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
     const dayOfWeek = today.getDay() // 0=Sunday
     today.setHours(0, 0, 0, 0)
 
-    // Get subjects for current semester
-    const subjects = await prisma.subject.findMany({
+    // Parallelize independent queries
+    const subjectsPromise = prisma.subject.findMany({
       where: {
         semesterId: studentProfile.semesterId,
         departmentId: studentProfile.departmentId,
@@ -101,10 +101,8 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
       },
     })
 
-    // Get today's timetable
-    let todaySchedule: StudentDashboardData["todaySchedule"] = []
-    if (dayOfWeek !== 0) { // No classes on Sunday
-      const timetable = await prisma.timetable.findMany({
+    const timetablePromise = dayOfWeek !== 0
+      ? prisma.timetable.findMany({
         where: {
           semesterId: studentProfile.semesterId,
           departmentId: studentProfile.departmentId,
@@ -118,9 +116,34 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
         },
         orderBy: { period: "asc" },
       })
+      : Promise.resolve([])
 
+    const attendanceRecordsPromise = prisma.attendanceRecord.findMany({
+      where: {
+        studentId: studentProfile.id,
+        semesterId: studentProfile.semesterId,
+      },
+      select: {
+        subjectId: true,
+        status: true,
+        subject: { select: { id: true, code: true, name: true } },
+      },
+    })
+
+    const dailyAttendancePromise = getDailyAttendanceStatus(studentProfile.id)
+
+    const [subjects, timetable, attendanceRecords, dailyAttendance] = await Promise.all([
+      subjectsPromise,
+      timetablePromise,
+      attendanceRecordsPromise,
+      dailyAttendancePromise
+    ])
+
+    // Process today's timetable
+    let todaySchedule: StudentDashboardData["todaySchedule"] = []
+    if (dayOfWeek !== 0) { // No classes on Sunday
       // Period times now use centralized utility with Friday support
-      todaySchedule = timetable.map((t) => ({
+      todaySchedule = timetable.map((t: any) => ({
         period: t.period,
         time: getPeriodTimeDisplay(dayOfWeek, t.period),
         subject: t.subject.name,
@@ -129,24 +152,13 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
       }))
     }
 
-    // Get attendance stats
-    const attendanceRecords = await prisma.attendanceRecord.findMany({
-      where: {
-        studentId: studentProfile.id,
-        semesterId: studentProfile.semesterId,
-      },
-      include: {
-        subject: { select: { id: true, code: true, name: true } },
-      },
-    })
-
     const totalClasses = attendanceRecords.length
-    const presentClasses = attendanceRecords.filter((r) => r.status === "PRESENT").length
+    const presentClasses = attendanceRecords.filter((r: any) => r.status === "PRESENT").length
     const overallAttendance = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0
 
     // Calculate per-subject attendance
     const subjectStats = new Map<string, { code: string; name: string; present: number; total: number }>()
-    for (const record of attendanceRecords) {
+    for (const record of attendanceRecords as any[]) {
       const key = record.subjectId
       if (!subjectStats.has(key)) {
         subjectStats.set(key, {
@@ -167,15 +179,12 @@ export async function getStudentDashboardData(): Promise<ActionResult<StudentDas
     }))
 
     // Current courses with faculty
-    const currentCourses = subjects.map((s) => ({
+    const currentCourses = subjects.map((s: any) => ({
       code: s.code,
       name: s.name,
       faculty: s.facultyAssigned[0]?.faculty.user.name || "TBA",
       progress: subjectAttendance.find(sa => sa.code === s.code)?.percentage || 0,
     }))
-
-    // Get today's daily attendance status (5 periods)
-    const dailyAttendance = await getDailyAttendanceStatus(studentProfile.id)
 
     return successResponse({
       user: {
@@ -289,61 +298,29 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
     const dayOfWeek = today.getDay()
     today.setHours(0, 0, 0, 0)
 
-    let todayClasses: FacultyDashboardData["todayClasses"] = []
-    if (dayOfWeek !== 0) {
-      const timetable = await prisma.timetable.findMany({
-        where: {
-          facultyId: facultyProfile.id,
-          dayOfWeek: dayOfWeek,
-        },
+    // Start parallelizing queries
+    const subjectIds = facultyProfile.subjectsAssigned.map((sa: any) => sa.subjectId)
+
+    const markedSubjectsPromise = dayOfWeek !== 0
+      ? prisma.attendanceRecord.findMany({
+        where: { markedBy: facultyProfile.id, date: today },
+        select: { subjectId: true },
+        distinct: ["subjectId"],
+      })
+      : Promise.resolve([])
+
+    const timetablePromise = dayOfWeek !== 0
+      ? prisma.timetable.findMany({
+        where: { facultyId: facultyProfile.id, dayOfWeek: dayOfWeek },
         include: {
           subject: { select: { id: true, code: true, name: true } },
           semester: { select: { number: true } },
         },
         orderBy: { period: "asc" },
       })
+      : Promise.resolve([])
 
-      // Period times use centralized utility with Friday support
-
-      // Check which classes have attendance marked today
-      const markedSubjects = await prisma.attendanceRecord.findMany({
-        where: {
-          markedBy: facultyProfile.id,
-          date: today,
-        },
-        select: { subjectId: true },
-        distinct: ["subjectId"],
-      })
-      const markedSet = new Set(markedSubjects.map((m) => m.subjectId))
-
-      todayClasses = await Promise.all(
-        timetable.map(async (t) => {
-          // Count students in this semester/department
-          const studentCount = await prisma.studentProfile.count({
-            where: {
-              semesterId: t.semesterId,
-              departmentId: t.departmentId,
-            },
-          })
-
-          return {
-            period: t.period,
-            time: getPeriodTimeDisplay(dayOfWeek, t.period),
-            subjectId: t.subject.id,
-            subjectCode: t.subject.code,
-            subjectName: t.subject.name,
-            room: t.room,
-            semester: t.semester.number,
-            studentCount,
-            attendanceMarked: markedSet.has(t.subjectId),
-          }
-        })
-      )
-    }
-
-    // Count total students across all assigned subjects
-    const subjectIds = facultyProfile.subjectsAssigned.map((sa) => sa.subjectId)
-    const studentCount = await prisma.studentProfile.count({
+    const totalStudentCountPromise = prisma.studentProfile.count({
       where: {
         semester: {
           subjects: {
@@ -353,44 +330,77 @@ export async function getFacultyDashboardData(): Promise<ActionResult<FacultyDas
       },
     })
 
-    // Count attendance marked today
-    const attendanceMarkedToday = await prisma.attendanceRecord.count({
+    const attendanceMarkedTodayPromise = prisma.attendanceRecord.count({
       where: {
         markedBy: facultyProfile.id,
         date: today,
       },
     })
 
-    const subjects = facultyProfile.subjectsAssigned.map((sa) => ({
+    const weeklyTimetablePromise = prisma.timetable.findMany({
+      where: { facultyId: facultyProfile.id },
+      include: {
+        subject: { select: { name: true, code: true } },
+        semester: { select: { number: true } },
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { period: 'asc' }],
+    })
+
+    const studentCountsListPromise = prisma.studentProfile.groupBy({
+      by: ['semesterId', 'departmentId'],
+      _count: { id: true },
+    })
+
+    // Execute all concurrently
+    const [
+      markedSubjects,
+      timetable,
+      studentCount,
+      attendanceMarkedToday,
+      weeklyTimetable,
+      studentCountsList
+    ] = await Promise.all([
+      markedSubjectsPromise,
+      timetablePromise,
+      totalStudentCountPromise,
+      attendanceMarkedTodayPromise,
+      weeklyTimetablePromise,
+      studentCountsListPromise
+    ])
+
+    const studentCountMap = new Map(
+      studentCountsList.map((item: any) => [`${item.semesterId}-${item.departmentId}`, item._count.id])
+    )
+
+    let todayClasses: FacultyDashboardData["todayClasses"] = []
+    if (dayOfWeek !== 0) {
+      const markedSet = new Set(markedSubjects.map((m: any) => m.subjectId))
+
+      todayClasses = timetable.map((t: any) => {
+        const key = `${t.semesterId}-${t.departmentId}`
+        const count = studentCountMap.get(key) || 0
+
+        return {
+          period: t.period,
+          time: getPeriodTimeDisplay(dayOfWeek, t.period),
+          subjectId: t.subject.id,
+          subjectCode: t.subject.code,
+          subjectName: t.subject.name,
+          room: t.room,
+          semester: t.semester.number,
+          studentCount: count,
+          attendanceMarked: markedSet.has(t.subjectId),
+        }
+      })
+    }
+
+    const subjects = facultyProfile.subjectsAssigned.map((sa: any) => ({
       id: sa.subject.id,
       code: sa.subject.code,
       name: sa.subject.name,
       semester: sa.subject.semester.number,
     }))
 
-    // Get full weekly timetable for faculty
-    const weeklyTimetable = await prisma.timetable.findMany({
-      where: {
-        facultyId: facultyProfile.id,
-      },
-      include: {
-        subject: {
-          select: {
-            name: true,
-            code: true,
-          },
-        },
-        semester: {
-          select: {
-            number: true,
-          },
-        },
-      },
-      orderBy: [
-        { dayOfWeek: 'asc' },
-        { period: 'asc' },
-      ],
-    })
 
     return successResponse({
       user: {
@@ -463,45 +473,53 @@ export async function getAdminDashboardData(): Promise<ActionResult<AdminDashboa
       return errorResponse("Unauthorized", "UNAUTHORIZED")
     }
 
-    // Count users by role
-    const [studentCount, facultyCount, adminCount] = await Promise.all([
+    // Execute all dashboard queries concurrently for maximum performance
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const [
+      studentCount,
+      facultyCount,
+      adminCount,
+      subjectCount,
+      departmentCount,
+      recentNotices,
+      upcomingEvents
+    ] = await Promise.all([
+      // Count users by role
       prisma.user.count({ where: { role: "STUDENT", isActive: true, deletedAt: null } }),
       prisma.user.count({ where: { role: "FACULTY", isActive: true, deletedAt: null } }),
       prisma.user.count({ where: { role: "ADMIN", isActive: true, deletedAt: null } }),
-    ])
 
-    // Count subjects and departments
-    const [subjectCount, departmentCount] = await Promise.all([
+      // Count subjects and departments
       prisma.subject.count(),
       prisma.department.count(),
+
+      // Get recent notices
+      prisma.notice.findMany({
+        take: 5,
+        orderBy: { publishedAt: "desc" },
+        select: {
+          id: true,
+          title: true,
+          publishedAt: true,
+          isImportant: true,
+        },
+      }),
+
+      // Get upcoming events
+      prisma.event.findMany({
+        where: { eventDate: { gte: today } },
+        take: 5,
+        orderBy: { eventDate: "asc" },
+        select: {
+          id: true,
+          title: true,
+          eventDate: true,
+          location: true,
+        },
+      })
     ])
-
-    // Get recent notices
-    const recentNotices = await prisma.notice.findMany({
-      take: 5,
-      orderBy: { publishedAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        publishedAt: true,
-        isImportant: true,
-      },
-    })
-
-    // Get upcoming events
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const upcomingEvents = await prisma.event.findMany({
-      where: { eventDate: { gte: today } },
-      take: 5,
-      orderBy: { eventDate: "asc" },
-      select: {
-        id: true,
-        title: true,
-        eventDate: true,
-        location: true,
-      },
-    })
 
     return successResponse({
       user: {

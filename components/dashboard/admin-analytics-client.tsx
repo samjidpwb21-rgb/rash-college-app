@@ -1,31 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    PieChart,
-    Pie,
-    Cell,
-    AreaChart,
-    Area,
-} from "recharts"
-import { Download, TrendingUp, TrendingDown, AlertCircle } from "lucide-react"
-import { getDepartmentColor, getDayColor } from "@/lib/chart-colors"
-import { CustomBarTooltip } from "@/lib/custom-bar-tooltip"
+import dynamic from "next/dynamic"
+const SemesterTrendChart = dynamic(() => import("@/components/dashboard/charts/semester-trend-chart"), { ssr: false })
+const StudentDistributionChart = dynamic(() => import("@/components/dashboard/charts/student-distribution-chart"), { ssr: false })
+const DepartmentComparisonChart = dynamic(() => import("@/components/dashboard/charts/department-comparison-chart"), { ssr: false })
+const HourlyPatternChart = dynamic(() => import("@/components/dashboard/charts/hourly-pattern-chart"), { ssr: false })
+const AttendanceByDayChart = dynamic(() => import("@/components/dashboard/charts/attendance-by-day-chart"), { ssr: false })
+import { Download, TrendingUp, TrendingDown, AlertCircle, Loader2 } from "lucide-react"
 import { generateCSV, downloadCSV } from "@/lib/csv-export"
+import {
+    getAnalyticsStats,
+    getSemesterTrendData,
+    getDepartmentComparisonData,
+    getAttendanceByDayData,
+    getAttendanceDistributionData,
+    getHourlyPatternData,
+    type TimePeriod
+} from "@/actions/admin/analytics-data"
 
 interface AnalyticsClientProps {
     stats: {
@@ -43,15 +40,32 @@ interface AnalyticsClientProps {
     hourlyPattern: Array<{ hour: string; attendance: number }>
 }
 
+const PERIOD_LABELS: Record<TimePeriod, string> = {
+    week: "This Week",
+    month: "This Month",
+    semester: "This Semester",
+    year: "This Year"
+}
+
 export function AnalyticsClient({
-    stats,
-    semesterTrend,
-    departmentComparison,
-    attendanceByDay,
-    attendanceDistribution,
-    hourlyPattern
+    stats: initialStats,
+    semesterTrend: initialSemesterTrend,
+    departmentComparison: initialDepartmentComparison,
+    attendanceByDay: initialAttendanceByDay,
+    attendanceDistribution: initialAttendanceDistribution,
+    hourlyPattern: initialHourlyPattern
 }: AnalyticsClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("semester")
+    const [isPending, startTransition] = useTransition()
+
+    // Live state — starts with server-fetched data, updates on filter change
+    const [stats, setStats] = useState(initialStats)
+    const [semesterTrend, setSemesterTrend] = useState(initialSemesterTrend)
+    const [departmentComparison, setDepartmentComparison] = useState(initialDepartmentComparison)
+    const [attendanceByDay, setAttendanceByDay] = useState(initialAttendanceByDay)
+    const [attendanceDistribution, setAttendanceDistribution] = useState(initialAttendanceDistribution)
+    const [hourlyPattern, setHourlyPattern] = useState(initialHourlyPattern)
 
     const user = {
         name: "Admin User",
@@ -61,110 +75,117 @@ export function AnalyticsClient({
 
     const hasData = stats !== null && (semesterTrend.length > 0 || departmentComparison.length > 0 || attendanceByDay.length > 0)
 
+    // Called when the user changes the time period
+    function handlePeriodChange(value: string) {
+        const period = value as TimePeriod
+        setSelectedPeriod(period)
+
+        startTransition(async () => {
+            const [statsRes, trendRes, deptRes, dayRes, distRes, hourlyRes] = await Promise.all([
+                getAnalyticsStats(period),
+                getSemesterTrendData(period),
+                getDepartmentComparisonData(period),
+                getAttendanceByDayData(period),
+                getAttendanceDistributionData(period),
+                getHourlyPatternData(period)
+            ])
+
+            if (statsRes.success) setStats(statsRes.data)
+            if (trendRes.success) setSemesterTrend(trendRes.data)
+            if (deptRes.success) setDepartmentComparison(deptRes.data)
+            if (dayRes.success) setAttendanceByDay(dayRes.data)
+            if (distRes.success) setAttendanceDistribution(distRes.data)
+            if (hourlyRes.success) setHourlyPattern(hourlyRes.data)
+        })
+    }
+
     const handleExport = () => {
-        // Prepare export data
         const exportData = []
 
-        // Add summary stats
         if (stats) {
             exportData.push(
+                { Section: "Summary", Metric: "Period", Value: PERIOD_LABELS[selectedPeriod] },
                 { Section: "Summary", Metric: "Average Attendance", Value: `${stats.averageAttendance}%` },
                 { Section: "Summary", Metric: "Peak Day", Value: stats.peakDay },
                 { Section: "Summary", Metric: "Peak Day Rate", Value: `${stats.peakDayRate}%` },
                 { Section: "Summary", Metric: "At-Risk Students", Value: stats.atRiskStudents.toString() },
                 { Section: "Summary", Metric: "Classes Tracked", Value: stats.classesTracked.toString() },
                 { Section: "Summary", Metric: "Trend", Value: `${stats.trend > 0 ? "+" : ""}${stats.trend}%` },
-                { Section: "", Metric: "", Value: "" } // Empty row
+                { Section: "", Metric: "", Value: "" }
             )
         }
 
-        // Add semester trend data
         if (semesterTrend.length > 0) {
-            exportData.push({ Section: "Semester Trend", Metric: "Month", Value: "Attendance %" })
+            exportData.push({ Section: "Trend", Metric: "Bucket", Value: "Attendance %" })
             semesterTrend.forEach(item => {
-                exportData.push({
-                    Section: "Semester Trend",
-                    Metric: item.month,
-                    Value: `${item.attendance}%`
-                })
+                exportData.push({ Section: "Trend", Metric: item.month, Value: `${item.attendance}%` })
             })
-            exportData.push({ Section: "", Metric: "", Value: "" }) // Empty row
+            exportData.push({ Section: "", Metric: "", Value: "" })
         }
 
-        // Add department comparison data
         if (departmentComparison.length > 0) {
-            exportData.push({ Section: "Department Comparison", Metric: "Department", Value: "Current %" })
+            exportData.push({ Section: "Department", Metric: "Name", Value: "Current %" })
             departmentComparison.forEach(item => {
-                exportData.push({
-                    Section: "Department Comparison",
-                    Metric: item.name,
-                    Value: `${item.current}%`
-                })
+                exportData.push({ Section: "Department", Metric: item.name, Value: `${item.current}%` })
             })
-            exportData.push({ Section: "", Metric: "", Value: "" }) // Empty row
+            exportData.push({ Section: "", Metric: "", Value: "" })
         }
 
-        // Add attendance by day data
         if (attendanceByDay.length > 0) {
-            exportData.push({ Section: "Attendance by Day", Metric: "Day", Value: "Rate %" })
+            exportData.push({ Section: "By Day", Metric: "Day", Value: "Rate %" })
             attendanceByDay.forEach(item => {
-                exportData.push({
-                    Section: "Attendance by Day",
-                    Metric: item.day,
-                    Value: `${item.rate}%`
-                })
+                exportData.push({ Section: "By Day", Metric: item.day, Value: `${item.rate}%` })
             })
-            exportData.push({ Section: "", Metric: "", Value: "" }) // Empty row
+            exportData.push({ Section: "", Metric: "", Value: "" })
         }
 
-        // Add attendance distribution data
         if (attendanceDistribution.length > 0) {
-            exportData.push({ Section: "Student Distribution", Metric: "Range", Value: "Count" })
+            exportData.push({ Section: "Distribution", Metric: "Range", Value: "Count" })
             attendanceDistribution.forEach(item => {
-                exportData.push({
-                    Section: "Student Distribution",
-                    Metric: item.range,
-                    Value: item.count.toString()
-                })
+                exportData.push({ Section: "Distribution", Metric: item.range, Value: item.count.toString() })
             })
-            exportData.push({ Section: "", Metric: "", Value: "" }) // Empty row
+            exportData.push({ Section: "", Metric: "", Value: "" })
         }
 
-        // Add hourly pattern data
         if (hourlyPattern.length > 0) {
-            exportData.push({ Section: "Hourly Pattern", Metric: "Hour", Value: "Attendance %" })
+            exportData.push({ Section: "Hourly", Metric: "Period", Value: "Attendance %" })
             hourlyPattern.forEach(item => {
-                exportData.push({
-                    Section: "Hourly Pattern",
-                    Metric: item.hour,
-                    Value: `${item.attendance}%`
-                })
+                exportData.push({ Section: "Hourly", Metric: item.hour, Value: `${item.attendance}%` })
             })
         }
 
-        // Generate and download CSV
-        const csv = generateCSV(exportData)
+        const headers = exportData.length > 0 ? Object.keys(exportData[0]) : ["Section", "Metric", "Value"]
+        const csv = generateCSV(exportData, headers)
         const timestamp = new Date().toISOString().split('T')[0]
-        downloadCSV(csv, `attendance-analytics-${timestamp}.csv`)
+        downloadCSV(csv, `analytics-${selectedPeriod}-${timestamp}.csv`)
     }
 
     return (
-        <div className="min-h-screen bg-slate-900">
+        <div className="min-h-screen bg-background">
             <DashboardSidebar role="admin" />
             <MobileSidebar role="admin" open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
             <div className="lg:ml-64">
                 <DashboardHeader title="Analytics & Reports" user={user} onMenuClick={() => setSidebarOpen(true)} />
 
-                <main className="p-6 space-y-6">
+                <main className="p-4 sm:p-6 space-y-6">
                     <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                         <div>
-                            <h2 className="text-2xl font-bold text-white">Attendance Analytics</h2>
-                            <p className="text-white">Comprehensive insights and trends</p>
+                            <h2 className="text-2xl font-bold text-foreground">Attendance Analytics</h2>
+                            <p className="text-muted-foreground">
+                                Comprehensive insights for{" "}
+                                <span className="font-semibold text-foreground">{PERIOD_LABELS[selectedPeriod]}</span>
+                            </p>
                         </div>
-                        <div className="flex gap-3">
-                            <Select defaultValue="semester">
-                                <SelectTrigger className="w-40 text-white">
+                        <div className="flex gap-3 items-center">
+                            {isPending && (
+                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Loading...
+                                </div>
+                            )}
+                            <Select value={selectedPeriod} onValueChange={handlePeriodChange} disabled={isPending}>
+                                <SelectTrigger className="w-40">
                                     <SelectValue placeholder="Time Period" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -174,14 +195,15 @@ export function AnalyticsClient({
                                     <SelectItem value="year">This Year</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button variant="outline" onClick={handleExport}>
+                            <Button variant="outline" onClick={handleExport} disabled={isPending}>
                                 <Download className="h-4 w-4 mr-2" />
                                 Export
                             </Button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {/* Stats Cards */}
+                    <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-200 ${isPending ? "opacity-50" : "opacity-100"}`}>
                         <Card>
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
@@ -190,7 +212,7 @@ export function AnalyticsClient({
                                         <p className="text-3xl font-bold text-foreground">{stats ? `${stats.averageAttendance}%` : "N/A"}</p>
                                     </div>
                                     {stats && stats.trend !== 0 && (
-                                        <div className={`flex items-center gap-1 ${stats.trend > 0 ? "text-accent" : "text-destructive"}`}>
+                                        <div className={`flex items-center gap-1 ${stats.trend > 0 ? "text-green-500" : "text-destructive"}`}>
                                             {stats.trend > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                                             <span className="text-sm font-medium">{stats.trend > 0 ? "+" : ""}{stats.trend}%</span>
                                         </div>
@@ -229,7 +251,7 @@ export function AnalyticsClient({
                                         <p className="text-sm text-muted-foreground">Classes Tracked</p>
                                         <p className="text-3xl font-bold text-foreground">{stats?.classesTracked ?? 0}</p>
                                     </div>
-                                    <span className="text-sm text-muted-foreground">This month</span>
+                                    <span className="text-sm text-muted-foreground">{PERIOD_LABELS[selectedPeriod]}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -242,7 +264,7 @@ export function AnalyticsClient({
                                     <AlertCircle className="h-12 w-12 text-muted-foreground" />
                                     <h3 className="text-lg font-semibold text-foreground">No Analytics Data Available</h3>
                                     <p className="text-sm text-muted-foreground max-w-md">
-                                        No attendance records found. Analytics will be generated once faculty start marking attendance.
+                                        No attendance records found for {PERIOD_LABELS[selectedPeriod]}. Try selecting a longer time period.
                                     </p>
                                 </div>
                             </CardContent>
@@ -250,46 +272,19 @@ export function AnalyticsClient({
                     )}
 
                     {hasData && (
-                        <>
+                        <div className={`space-y-6 transition-opacity duration-200 ${isPending ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Semester Trend vs Target</CardTitle>
-                                        <CardDescription>Monthly attendance rate compared to 85% target</CardDescription>
+                                        <CardTitle>Attendance Trend vs Target</CardTitle>
+                                        <CardDescription>
+                                            {selectedPeriod === "week" ? "Daily" : selectedPeriod === "month" ? "Weekly" : "Monthly"} attendance rate compared to 85% target
+                                        </CardDescription>
                                     </CardHeader>
                                     <CardContent>
                                         {semesterTrend.length > 0 ? (
                                             <div className="h-72">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={semesterTrend}>
-                                                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                        <XAxis dataKey="month" className="text-xs" />
-                                                        <YAxis className="text-xs" domain={[0, 100]} />
-                                                        <Tooltip
-                                                            contentStyle={{
-                                                                backgroundColor: "hsl(var(--card))",
-                                                                border: "1px solid hsl(var(--border))",
-                                                                borderRadius: "8px",
-                                                            }}
-                                                        />
-                                                        <Area
-                                                            type="monotone"
-                                                            dataKey="attendance"
-                                                            stroke="hsl(var(--primary))"
-                                                            fill="hsl(var(--primary))"
-                                                            fillOpacity={0.2}
-                                                            name="Actual"
-                                                        />
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey="target"
-                                                            stroke="hsl(var(--destructive))"
-                                                            strokeDasharray="5 5"
-                                                            dot={false}
-                                                            name="Target"
-                                                        />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
+                                                <SemesterTrendChart data={semesterTrend} />
                                             </div>
                                         ) : (
                                             <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -308,24 +303,7 @@ export function AnalyticsClient({
                                         {attendanceDistribution.length > 0 && attendanceDistribution.some(d => d.count > 0) ? (
                                             <>
                                                 <div className="h-52">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={attendanceDistribution}
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                outerRadius={80}
-                                                                dataKey="count"
-                                                                label={({ range, percent }) => `${range} (${(percent * 100).toFixed(0)}%)`}
-                                                                labelLine={false}
-                                                            >
-                                                                {attendanceDistribution.map((entry, index) => (
-                                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                                ))}
-                                                            </Pie>
-                                                            <Tooltip />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
+                                                    <StudentDistributionChart data={attendanceDistribution} />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-2 mt-4">
                                                     {attendanceDistribution.map((item) => (
@@ -351,31 +329,12 @@ export function AnalyticsClient({
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Department Comparison</CardTitle>
-                                        <CardDescription>Current vs previous period</CardDescription>
+                                        <CardDescription>Current vs previous period attendance rates</CardDescription>
                                     </CardHeader>
                                     <CardContent>
                                         {departmentComparison.length > 0 ? (
                                             <div className="h-72">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={departmentComparison} layout="vertical">
-                                                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                        <XAxis type="number" domain={[0, 100]} className="text-xs" />
-                                                        <YAxis dataKey="name" type="category" className="text-xs" width={100} />
-                                                        <Tooltip
-                                                            contentStyle={{
-                                                                backgroundColor: "hsl(var(--card))",
-                                                                border: "1px solid hsl(var(--border))",
-                                                                borderRadius: "8px",
-                                                            }}
-                                                        />
-                                                        <Bar dataKey="current" radius={[0, 8, 8, 0]} name="Current">
-                                                            {departmentComparison.map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={getDepartmentColor(entry.name)} />
-                                                            ))}
-                                                        </Bar>
-                                                        <Bar dataKey="previous" fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} name="Previous" />
-                                                    </BarChart>
-                                                </ResponsiveContainer>
+                                                <DepartmentComparisonChart data={departmentComparison} />
                                             </div>
                                         ) : (
                                             <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -393,28 +352,7 @@ export function AnalyticsClient({
                                     <CardContent>
                                         {hourlyPattern.length > 0 ? (
                                             <div className="h-72">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={hourlyPattern}>
-                                                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                        <XAxis dataKey="hour" className="text-xs" />
-                                                        <YAxis className="text-xs" domain={[0, 100]} />
-                                                        <Tooltip
-                                                            contentStyle={{
-                                                                backgroundColor: "hsl(var(--card))",
-                                                                border: "1px solid hsl(var(--border))",
-                                                                borderRadius: "8px",
-                                                            }}
-                                                        />
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey="attendance"
-                                                            stroke="hsl(var(--accent))"
-                                                            strokeWidth={2}
-                                                            dot={{ fill: "hsl(var(--accent))" }}
-                                                            name="Attendance %"
-                                                        />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
+                                                <HourlyPatternChart data={hourlyPattern} />
                                             </div>
                                         ) : (
                                             <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -428,24 +366,12 @@ export function AnalyticsClient({
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Attendance by Day of Week</CardTitle>
-                                    <CardDescription>Average attendance rate for each day</CardDescription>
+                                    <CardDescription>Average attendance rate for each weekday</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     {attendanceByDay.length > 0 ? (
                                         <div className="h-72">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={attendanceByDay}>
-                                                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                    <XAxis dataKey="day" className="text-xs" />
-                                                    <YAxis className="text-xs" domain={[0, 100]} />
-                                                    <Tooltip content={<CustomBarTooltip colorKey="day" />} />
-                                                    <Bar dataKey="rate" radius={[8, 8, 0, 0]} name="Attendance %">
-                                                        {attendanceByDay.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={getDayColor(entry.day)} />
-                                                        ))}
-                                                    </Bar>
-                                                </BarChart>
-                                            </ResponsiveContainer>
+                                            <AttendanceByDayChart data={attendanceByDay} />
                                         </div>
                                     ) : (
                                         <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -454,7 +380,7 @@ export function AnalyticsClient({
                                     )}
                                 </CardContent>
                             </Card>
-                        </>
+                        </div>
                     )}
                 </main>
             </div>

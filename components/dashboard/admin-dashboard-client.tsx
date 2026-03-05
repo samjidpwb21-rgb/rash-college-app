@@ -5,7 +5,7 @@
 // ============================================================================
 // Client wrapper for interactive elements
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -13,9 +13,9 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import dynamic from "next/dynamic"
+const UserDistributionChart = dynamic(() => import("@/components/dashboard/charts/user-distribution-chart"), { ssr: false })
 import { Users, BookOpen, Building2, GraduationCap, ArrowRight, Bell, Calendar } from "lucide-react"
-import { useLoading } from "@/contexts/loading-context"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 interface AdminDashboardProps {
@@ -54,15 +54,8 @@ interface AdminDashboardProps {
 
 export function AdminDashboardClient({ data }: AdminDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const { forceFinishAll } = useLoading()
 
     const user = data.user
-
-    // Force clear any stuck loading states when dashboard mounts
-    // This ensures the login loading animation stops even if there are orphaned operations
-    useEffect(() => {
-        forceFinishAll()
-    }, [])
 
     return (
         <div className="min-h-screen bg-slate-900">
@@ -118,24 +111,7 @@ export function AdminDashboardClient({ data }: AdminDashboardProps) {
                             </CardHeader>
                             <CardContent>
                                 <div className="h-52">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={data.userDistribution}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={50}
-                                                outerRadius={70}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {data.userDistribution.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    <UserDistributionChart data={data.userDistribution} />
                                 </div>
                                 <div className="flex justify-center gap-4 mt-4">
                                     {data.userDistribution.map((item) => (

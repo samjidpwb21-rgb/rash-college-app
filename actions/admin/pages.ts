@@ -228,6 +228,8 @@ export interface SubjectData {
     code: string
     name: string
     departmentName: string
+    departmentId: string
+    semesterId: string
     semester: number
     type: "theory" | "practical"
     facultyName: string
@@ -265,6 +267,8 @@ export async function getAdminSubjectsData(): Promise<ActionResult<SubjectData[]
                 code: s.code,
                 name: s.name,
                 departmentName: s.department.name,
+                departmentId: s.departmentId,
+                semesterId: s.semesterId,
                 semester: s.semester.number,
                 type: s.type.toLowerCase() as "theory" | "practical",
                 facultyName: s.facultyAssigned[0]?.faculty.user.name || "TBA",

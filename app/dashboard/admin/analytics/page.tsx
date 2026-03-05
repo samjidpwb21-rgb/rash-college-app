@@ -28,14 +28,14 @@ export default async function AnalyticsPage() {
     redirect(`/dashboard/${session.user.role.toLowerCase()}`)
   }
 
-  // 2. Fetch all real analytics data
+  // 2. Fetch all real analytics data with default period "semester"
   const [statsResult, trendResult, deptResult, dayResult, distResult, hourlyResult] = await Promise.all([
-    getAnalyticsStats(),
-    getSemesterTrendData(),
-    getDepartmentComparisonData(),
-    getAttendanceByDayData(),
-    getAttendanceDistributionData(),
-    getHourlyPatternData()
+    getAnalyticsStats("semester"),
+    getSemesterTrendData("semester"),
+    getDepartmentComparisonData("semester"),
+    getAttendanceByDayData("semester"),
+    getAttendanceDistributionData("semester"),
+    getHourlyPatternData("semester")
   ])
 
   const stats = statsResult.success ? statsResult.data : null

@@ -148,12 +148,6 @@ export function FacultyNoticesClient({ notices, user }: FacultyNoticesClientProp
             return
         }
 
-        // Auto-use faculty's department - no manual selection needed
-        if (!user.departmentId) {
-            toast({ title: "Error", description: "Faculty department not found", variant: "destructive" })
-            return
-        }
-
         setIsLoading(true)
         let imageUrl: string | undefined
 
@@ -176,12 +170,12 @@ export function FacultyNoticesClient({ notices, user }: FacultyNoticesClientProp
                 imageUrl = uploadResult.data?.fileUrl
             }
 
-            // Create notice with auto-assigned department
+            // Create notice with auto-assigned department (or global if undefined)
             const result = await createNotice({
                 title: formTitle,
                 content: formContent,
                 isImportant: formIsImportant,
-                departmentId: user.departmentId,  // Auto-assigned from faculty profile
+                departmentId: user.departmentId || undefined,  // Auto-assigned from faculty profile or global
                 type: formType,
                 imageUrl,
             })

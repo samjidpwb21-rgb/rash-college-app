@@ -1,11 +1,7 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
-import { Suspense } from "react"
-import GlobalLoaderWrapper from "@/components/ui/global-loader-wrapper"
-import { RouteLoader } from "@/components/route-loader"
-import { LoadingProvider } from "@/contexts/loading-context"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import "./globals.css"
 
@@ -27,6 +23,13 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,13 +44,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LoadingProvider>
-            <Suspense fallback={null}>
-              <GlobalLoaderWrapper />
-              <RouteLoader />
-            </Suspense>
-            {children}
-          </LoadingProvider>
+          {children}
           <Analytics />
         </ThemeProvider>
       </body>

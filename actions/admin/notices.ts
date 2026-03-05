@@ -38,10 +38,12 @@ export async function createNotice(
         // 2. Validate input
         const validated = createNoticeSchema.safeParse(input)
         if (!validated.success) {
-            return errorResponse(validated.error.errors[0].message)
+            const firstError = validated.error.errors[0]
+            console.error("Notice validation failed:", validated.error.errors)
+            return errorResponse(firstError.message)
         }
 
-        // 3. Create notice
+        // 3. Create the notice — this MUST succeed before anything else
         const notice = await prisma.notice.create({
             data: {
                 title: validated.data.title,
@@ -50,66 +52,77 @@ export async function createNotice(
                 expiresAt: validated.data.expiresAt ? new Date(validated.data.expiresAt) : null,
                 authorId: user.id,
                 imageUrl: input.imageUrl || null,
+                // departmentId is optional — null means campus-wide notice
                 departmentId: input.departmentId || null,
                 colorIndex: input.colorIndex ?? 0,
                 type: input.type || "GENERAL",
             },
         })
 
-        // 4. Create notifications for active users
-        let whereUserClause: any = { isActive: true, deletedAt: null }
+        // 4. Send notifications — isolated in its own try-catch so a failure
+        //    here NEVER causes the notice creation to report as failed.
+        try {
+            let userFilter: any = { isActive: true, deletedAt: null }
 
-        if (input.departmentId) {
-            // Find students and faculty in this department
-            // This is complex because StudentProfile and FacultyProfile link to department
-            // We need to find filtered profiles first, then get userIds
-            const studentUserIds = await prisma.studentProfile.findMany({
-                where: { departmentId: input.departmentId },
-                select: { userId: true }
+            if (input.departmentId) {
+                const [studentIds, facultyIds] = await Promise.all([
+                    prisma.studentProfile.findMany({
+                        where: { departmentId: input.departmentId },
+                        select: { userId: true }
+                    }),
+                    prisma.facultyProfile.findMany({
+                        where: { departmentId: input.departmentId },
+                        select: { userId: true }
+                    })
+                ])
+                const targetIds = [
+                    ...studentIds.map(s => s.userId),
+                    ...facultyIds.map(f => f.userId)
+                ]
+                if (targetIds.length === 0) {
+                    // No users in this dept — skip notifications
+                    return successResponse(notice, "Notice created successfully")
+                }
+                userFilter.id = { in: targetIds }
+            }
+
+            const targetUsers = await prisma.user.findMany({
+                where: userFilter,
+                select: { id: true, role: true },
+                take: 500, // Guard against huge notification batches
             })
 
-            const facultyUserIds = await prisma.facultyProfile.findMany({
-                where: { departmentId: input.departmentId },
-                select: { userId: true }
-            })
+            if (targetUsers.length > 0) {
+                const messageSnippet = validated.data.content.substring(0, 100) +
+                    (validated.data.content.length > 100 ? "..." : "")
 
-            const targetUserIds = [
-                ...studentUserIds.map(s => s.userId),
-                ...facultyUserIds.map(f => f.userId)
-            ]
-
-            whereUserClause.id = { in: targetUserIds }
-        }
-
-        const users = await prisma.user.findMany({
-            where: whereUserClause,
-            select: { id: true, role: true },
-        })
-
-        if (users.length > 0) {
-            await prisma.notification.createMany({
-                data: users.map((u) => {
-                    let link = "/dashboard/student/notices"
-                    if (u.role === "FACULTY") link = "/dashboard/faculty/notices"
-                    if (u.role === "ADMIN") link = "/dashboard/admin/notices"
-
-                    return {
+                await prisma.notification.createMany({
+                    data: targetUsers.map((u) => ({
                         userId: u.id,
                         type: "NOTICE" as const,
-                        title: validated.data.title, // Use title as title
-                        message: validated.data.content.substring(0, 100) + (validated.data.content.length > 100 ? "..." : ""), // Use content snippet as message
-                        link: link,
-                    }
-                }),
-            })
+                        title: validated.data.title,
+                        message: messageSnippet,
+                        link: u.role === "FACULTY"
+                            ? "/dashboard/faculty/notices"
+                            : u.role === "ADMIN"
+                                ? "/dashboard/admin/notices"
+                                : "/dashboard/student/notices",
+                    })),
+                    skipDuplicates: true,
+                })
+            }
+        } catch (notifError) {
+            // Notification failure is non-fatal — notice was already created.
+            console.error("Notice notification dispatch failed (non-fatal):", notifError)
         }
 
         return successResponse(notice, "Notice created successfully")
     } catch (error) {
+        console.error("createNotice error:", error)
         if (error instanceof Error && error.message.includes("Unauthorized")) {
-            return errorResponse("Unauthorized: Admin access required", "UNAUTHORIZED")
+            return errorResponse("Unauthorized: Admin or Faculty access required", "UNAUTHORIZED")
         }
-        return errorResponse("Failed to create notice")
+        return errorResponse("Failed to create notice. Please try again.")
     }
 }
 

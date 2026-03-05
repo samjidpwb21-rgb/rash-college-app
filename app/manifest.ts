@@ -6,10 +6,11 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: 'RASH College',
         description: 'Modern attendance tracking, student records, course management, and analytics for educational institutions',
         start_url: '/',
+        scope: '/',
         display: 'standalone',
         background_color: '#002366',
         theme_color: '#002366',
-        orientation: 'portrait-primary',
+        orientation: 'portrait',
         icons: [
             {
                 src: '/icons/icon-192x192.png',

@@ -45,10 +45,9 @@ interface AdminNoticesClientProps {
     notices: NoticeData[]
 }
 
-export function AdminNoticesClient({ notices: initialNotices }: AdminNoticesClientProps) {
+export function AdminNoticesClient({ notices }: AdminNoticesClientProps) {
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const [notices] = useState(initialNotices)
     const [searchQuery, setSearchQuery] = useState("")
 
     // Modal state

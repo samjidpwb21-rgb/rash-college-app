@@ -167,8 +167,6 @@ export function AdminUsersClient({ users }: AdminUsersClientProps) {
             errors.email = "Email is required"
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formEmail)) {
             errors.email = "Invalid email format"
-        } else if (!formEmail.toLowerCase().endsWith("@gmail.com")) {
-            errors.email = "Only Gmail addresses (@gmail.com) are allowed"
         } else {
             // Check for duplicate email
             const existingEmail = users.find(u => u.email.toLowerCase() === formEmail.toLowerCase())

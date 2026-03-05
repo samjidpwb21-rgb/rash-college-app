@@ -12,15 +12,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { CalendarDays, Clock, MapPin, Plus, Loader2 } from "lucide-react"
+import { CalendarDays, Clock, MapPin, Plus, Loader2, Trash2 } from "lucide-react"
 import { format, isSameDay } from "date-fns"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/hooks/use-toast"
-import { createEvent } from "@/actions/admin/events"
+import { createEvent, deleteEvent } from "@/actions/admin/events"
 
 interface EventData {
     id: string
@@ -46,6 +47,11 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
     const [selectedDate, setSelectedDate] = useState<Date>(new Date())
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
+    // Delete state
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+    const [eventToDelete, setEventToDelete] = useState<EventData | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Form state
     const [formTitle, setFormTitle] = useState("")
@@ -116,8 +122,36 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
         }
     }
 
+    const openDeleteDialog = (event: EventData, e?: React.MouseEvent) => {
+        e?.stopPropagation()
+        setEventToDelete(event)
+        setIsDeleteDialogOpen(true)
+    }
+
+    const handleDeleteEvent = async () => {
+        if (!eventToDelete) return
+
+        setIsDeleting(true)
+        try {
+            const result = await deleteEvent(eventToDelete.id)
+
+            if (result.success) {
+                toast({ title: "Event Deleted", description: "Event has been deleted successfully." })
+                setIsDeleteDialogOpen(false)
+                setEventToDelete(null)
+                router.refresh()
+            } else {
+                toast({ title: "Error", description: result.error || "Failed to delete event", variant: "destructive" })
+            }
+        } catch {
+            toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" })
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return (
-        <div className="min-h-screen bg-slate-900">
+        <div className="min-h-screen bg-background">
             <DashboardSidebar role="faculty" />
 
             <MobileSidebar role="faculty" open={sidebarOpen} onOpenChange={setSidebarOpen} />
@@ -128,8 +162,8 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-2xl font-bold tracking-tight text-white">Campus Events</h2>
-                            <p className="text-slate-300">Upcoming events and activities</p>
+                            <h2 className="text-2xl font-bold tracking-tight text-foreground">Campus Events</h2>
+                            <p className="text-muted-foreground">Upcoming events and activities</p>
                         </div>
                         <Button className="gap-2" onClick={() => { resetForm(); setIsCreateModalOpen(true) }}>
                             <Plus className="h-4 w-4" />
@@ -150,12 +184,8 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
                                     selected={selectedDate}
                                     onSelect={(date) => date && setSelectedDate(date)}
                                     className="rounded-md border"
-                                    modifiers={{
-                                        hasEvent: eventDates,
-                                    }}
-                                    modifiersClassNames={{
-                                        hasEvent: "bg-primary/20 font-medium",
-                                    }}
+                                    modifiers={{ hasEvent: eventDates }}
+                                    modifiersClassNames={{ hasEvent: "bg-primary/20 font-medium" }}
                                 />
                             </CardContent>
                         </Card>
@@ -176,16 +206,27 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
                                                 key={event.id}
                                                 className="p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
                                             >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1 min-w-0">
                                                         <h4 className="font-semibold text-foreground">{event.title}</h4>
                                                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                                             {event.description}
                                                         </p>
                                                     </div>
-                                                    {event.isAllDay && (
-                                                        <Badge variant="secondary">All Day</Badge>
-                                                    )}
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {event.isAllDay && (
+                                                            <Badge variant="secondary">All Day</Badge>
+                                                        )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => openDeleteDialog(event)}
+                                                            title="Delete event"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
                                                     {event.time && (
@@ -224,16 +265,25 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
                                     {upcomingEvents.map((event) => (
                                         <div
                                             key={event.id}
-                                            className="p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                                            className="p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer relative group"
                                             onClick={() => setSelectedDate(new Date(event.date))}
                                         >
-                                            <h4 className="font-medium text-foreground line-clamp-1">{event.title}</h4>
+                                            {/* Delete button top-right */}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => openDeleteDialog(event, e)}
+                                                title="Delete event"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+
+                                            <h4 className="font-medium text-foreground line-clamp-1 pr-8">{event.title}</h4>
                                             <p className="text-sm text-muted-foreground mt-1">
                                                 {format(new Date(event.date), "MMM d, yyyy")}
                                             </p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {event.location}
-                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1">{event.location}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -322,6 +372,30 @@ export function FacultyEventsClient({ events, user }: FacultyEventsClientProps) 
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete <strong>{eventToDelete?.title}</strong>?
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteEvent}
+                            disabled={isDeleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Delete Event
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

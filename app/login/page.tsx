@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Eye, EyeOff, GraduationCap, Users } from "lucide-react"
-import { useLoading } from "@/contexts/loading-context"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
 
 export default function LoginPage() {
@@ -22,15 +21,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const { startLoading, finishLoading } = useLoading()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
-
-    // Start global loading animation immediately (login should show loader right away)
-    const loaderId = startLoading("login-auth", { immediate: true })
 
     try {
       // Map UI tab to expected role
@@ -57,7 +51,6 @@ export default function LoginPage() {
           setError("Invalid email/ID or password")
         }
         setLoading(false)
-        finishLoading(loaderId)
         return
       }
 
@@ -77,22 +70,18 @@ export default function LoginPage() {
 
         const redirectUrl = roleRoutes[session.user.role] || "/dashboard/student"
 
-        // Clear login loading state before redirect
         // This prevents the loader from continuing to loop after dashboard loads
-        finishLoading(loaderId)
 
         router.push(redirectUrl)
         router.refresh()
       } else {
         // Fallback - should not happen if login succeeded
-        finishLoading(loaderId) // Clear loading state
         router.push("/dashboard/student")
         router.refresh()
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
       setLoading(false)
-      finishLoading(loaderId)
     }
   }
 

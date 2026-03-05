@@ -72,8 +72,8 @@ export async function getStudentAttendancePageData(): Promise<ActionResult<Atten
         })
 
         // Calculate stats
-        const totalPresent = records.filter(r => r.status === "PRESENT").length
-        const totalAbsent = records.filter(r => r.status === "ABSENT").length
+        const totalPresent = records.filter((r: any) => r.status === "PRESENT").length
+        const totalAbsent = records.filter((r: any) => r.status === "ABSENT").length
         const total = records.length
         const attendanceRate = total > 0 ? Math.round((totalPresent / total) * 100) : 0
 
@@ -193,8 +193,8 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
             return errorResponse("Student profile not found", "NOT_FOUND")
         }
 
-        // Get timetable for this day
-        const timetable = await prisma.timetable.findMany({
+        // Execute independent database queries in parallel
+        const timetablePromise = prisma.timetable.findMany({
             where: {
                 semesterId: studentProfile.semesterId,
                 departmentId: studentProfile.departmentId,
@@ -209,16 +209,17 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
             orderBy: { period: "asc" },
         })
 
-        // Get attendance for this date
-        const attendance = await prisma.attendanceRecord.findMany({
+        const attendancePromise = prisma.attendanceRecord.findMany({
             where: {
                 studentId: studentProfile.id,
                 date: date,
             },
         })
 
+        const [timetable, attendance] = await Promise.all([timetablePromise, attendancePromise])
+
         const attendanceMap = new Map(
-            attendance.map(a => [`${a.subjectId}-${a.period}`, a.status])
+            attendance.map((a: any) => [`${a.subjectId}-${a.period}`, a.status])
         )
 
         // Period times use centralized utility with Friday support
@@ -226,7 +227,7 @@ export async function getDailyAttendance(dateStr: string): Promise<ActionResult<
         // Build 5 periods
         const periods: DailyAttendanceData["periods"] = Array.from({ length: 5 }, (_, i) => {
             const period = i + 1
-            const entry = timetable.find(t => t.period === period)
+            const entry = timetable.find((t: any) => t.period === period)
 
             if (!entry) {
                 return {
@@ -308,7 +309,7 @@ export async function getRecentAttendanceRecords(
         const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         // Period times now use centralized utility
 
-        return successResponse(records.map(r => ({
+        return successResponse(records.map((r: any) => ({
             date: r.date.toISOString().split("T")[0],
             day: dayNames[r.date.getDay()],
             subject: r.subject.name,

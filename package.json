@@ -50,7 +50,6 @@
     "input-otp": "latest",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
-    "lottie-react": "^2.4.1",
     "lucide-react": "^0.454.0",
     "next": "16.1.1",
     "next-auth": "^4.24.13",

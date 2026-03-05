@@ -6,14 +6,14 @@
 // ADMIN can create/edit/delete global events
 
 import { prisma } from "@/lib/db"
-import { requireRole } from "@/lib/auth"
+import { requireAnyRole } from "@/lib/auth"
 import { createEventSchema, updateEventSchema, uuidSchema } from "@/lib/validations"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
 import { Event } from "@prisma/client"
 
 /**
  * Create a new global event
- * ADMIN only
+ * ADMIN and FACULTY
  */
 export async function createEvent(
     input: {
@@ -28,7 +28,7 @@ export async function createEvent(
 ): Promise<ActionResult<Event>> {
     try {
         // 1. Validate session and role
-        const user = await requireRole("ADMIN")
+        const user = await requireAnyRole(["ADMIN", "FACULTY"])
 
         // 2. Validate input
         const validated = createEventSchema.safeParse(input)
@@ -42,8 +42,8 @@ export async function createEvent(
                 title: validated.data.title,
                 description: validated.data.description,
                 eventDate: new Date(validated.data.eventDate),
-                eventTime: validated.data.eventTime ? new Date(`1970-01-01T${validated.data.eventTime}`) : null,
-                endTime: validated.data.endTime ? new Date(`1970-01-01T${validated.data.endTime}`) : null,
+                eventTime: validated.data.eventTime ? new Date(`1970-01-01T${validated.data.eventTime}:00Z`) : null,
+                endTime: validated.data.endTime ? new Date(`1970-01-01T${validated.data.endTime}:00Z`) : null,
                 location: validated.data.location,
                 isAllDay: validated.data.isAllDay ?? false,
                 authorId: user.id,
@@ -71,7 +71,7 @@ export async function createEvent(
         return successResponse(event, "Event created successfully")
     } catch (error) {
         if (error instanceof Error && error.message.includes("Unauthorized")) {
-            return errorResponse("Unauthorized: Admin access required", "UNAUTHORIZED")
+            return errorResponse("Unauthorized: Admin or Faculty access required", "UNAUTHORIZED")
         }
         return errorResponse("Failed to create event")
     }
@@ -79,7 +79,7 @@ export async function createEvent(
 
 /**
  * Update an existing event
- * ADMIN only
+ * ADMIN and FACULTY
  */
 export async function updateEvent(
     input: {
@@ -95,7 +95,7 @@ export async function updateEvent(
 ): Promise<ActionResult<Event>> {
     try {
         // 1. Validate session and role
-        await requireRole("ADMIN")
+        await requireAnyRole(["ADMIN", "FACULTY"])
 
         // 2. Validate input
         const validated = updateEventSchema.safeParse(input)
@@ -120,10 +120,10 @@ export async function updateEvent(
                 description: validated.data.description,
                 eventDate: validated.data.eventDate ? new Date(validated.data.eventDate) : undefined,
                 eventTime: validated.data.eventTime !== undefined
-                    ? (validated.data.eventTime ? new Date(`1970-01-01T${validated.data.eventTime}`) : null)
+                    ? (validated.data.eventTime ? new Date(`1970-01-01T${validated.data.eventTime}:00Z`) : null)
                     : undefined,
                 endTime: validated.data.endTime !== undefined
-                    ? (validated.data.endTime ? new Date(`1970-01-01T${validated.data.endTime}`) : null)
+                    ? (validated.data.endTime ? new Date(`1970-01-01T${validated.data.endTime}:00Z`) : null)
                     : undefined,
                 location: validated.data.location,
                 isAllDay: validated.data.isAllDay,
@@ -133,7 +133,7 @@ export async function updateEvent(
         return successResponse(event, "Event updated successfully")
     } catch (error) {
         if (error instanceof Error && error.message.includes("Unauthorized")) {
-            return errorResponse("Unauthorized: Admin access required", "UNAUTHORIZED")
+            return errorResponse("Unauthorized: Admin or Faculty access required", "UNAUTHORIZED")
         }
         return errorResponse("Failed to update event")
     }
@@ -141,12 +141,12 @@ export async function updateEvent(
 
 /**
  * Delete an event
- * ADMIN only
+ * ADMIN and FACULTY
  */
 export async function deleteEvent(id: string): Promise<ActionResult<{ id: string }>> {
     try {
         // 1. Validate session and role
-        await requireRole("ADMIN")
+        await requireAnyRole(["ADMIN", "FACULTY"])
 
         // 2. Validate input
         const validated = uuidSchema.safeParse(id)
@@ -171,7 +171,7 @@ export async function deleteEvent(id: string): Promise<ActionResult<{ id: string
         return successResponse({ id: validated.data }, "Event deleted successfully")
     } catch (error) {
         if (error instanceof Error && error.message.includes("Unauthorized")) {
-            return errorResponse("Unauthorized: Admin access required", "UNAUTHORIZED")
+            return errorResponse("Unauthorized: Admin or Faculty access required", "UNAUTHORIZED")
         }
         return errorResponse("Failed to delete event")
     }
@@ -179,12 +179,12 @@ export async function deleteEvent(id: string): Promise<ActionResult<{ id: string
 
 /**
  * Get all events (admin view)
- * ADMIN only
+ * ADMIN and FACULTY
  */
 export async function getAdminEvents(): Promise<ActionResult<Event[]>> {
     try {
         // 1. Validate session and role
-        await requireRole("ADMIN")
+        await requireAnyRole(["ADMIN", "FACULTY"])
 
         // 2. Fetch all events
         const events = await prisma.event.findMany({
@@ -199,7 +199,7 @@ export async function getAdminEvents(): Promise<ActionResult<Event[]>> {
         return successResponse(events)
     } catch (error) {
         if (error instanceof Error && error.message.includes("Unauthorized")) {
-            return errorResponse("Unauthorized: Admin access required", "UNAUTHORIZED")
+            return errorResponse("Unauthorized: Admin or Faculty access required", "UNAUTHORIZED")
         }
         return errorResponse("Failed to fetch events")
     }

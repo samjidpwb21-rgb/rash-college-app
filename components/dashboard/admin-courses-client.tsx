@@ -4,7 +4,7 @@
 // CAMPUSTRACK - ADMIN COURSES CLIENT COMPONENT
 // ============================================================================
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -59,10 +59,15 @@ interface AdminCoursesClientProps {
 
 export function AdminCoursesClient({ subjects: initialSubjects, departments, semesters }: AdminCoursesClientProps) {
     const router = useRouter()
-    const [subjects] = useState(initialSubjects)
+    const [subjects, setSubjects] = useState(initialSubjects)
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedDept, setSelectedDept] = useState("all")
     const [sidebarOpen, setSidebarOpen] = useState(false)
+
+    // Sync subjects state when server re-renders with new data (after router.refresh())
+    useEffect(() => {
+        setSubjects(initialSubjects)
+    }, [initialSubjects])
 
     // Modal state
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)

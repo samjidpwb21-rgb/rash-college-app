@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Shield } from "lucide-react"
-import { useLoading } from "@/contexts/loading-context"
 
 export default function AdminLoginPage() {
     const router = useRouter()
@@ -19,15 +18,11 @@ export default function AdminLoginPage() {
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
-    const { startLoading, finishLoading } = useLoading()
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setError("")
-
-        // Start global loading animation
-        const loaderId = startLoading("admin-auth")
 
         try {
             // Use NextAuth signIn with Admin role
@@ -46,7 +41,6 @@ export default function AdminLoginPage() {
                     setError("Invalid email or password")
                 }
                 setLoading(false)
-                finishLoading(loaderId)
                 return
             }
 
@@ -62,14 +56,11 @@ export default function AdminLoginPage() {
             } else {
                 // User is not an admin
                 setError("Access denied. Admin privileges required.")
-                await signIn("logout") // Sign out non-admin user
                 setLoading(false)
-                finishLoading(loaderId)
             }
         } catch (err) {
             setError("An error occurred. Please try again.")
             setLoading(false)
-            finishLoading(loaderId)
         }
     }
 

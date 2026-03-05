@@ -5,25 +5,25 @@
 
 import nodemailer from "nodemailer"
 
-// Create reusable transporter
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-})
-
-// Verify transporter configuration on import
-transporter.verify((error, success) => {
-    if (error) {
-        console.error("Email transporter verification failed:", error)
-    } else {
-        console.log("Email server is ready to send messages")
-    }
-})
+// Lazily create the transporter so a bad .env at startup doesn't crash the module.
+// The transporter is created fresh on each email send, picking up the latest env vars.
+function createTransporter() {
+    return nodemailer.createTransport({
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: false,       // false = STARTTLS on port 587
+        requireTLS: true,    // Required by Gmail: enforces TLS upgrade
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS, // Must be a Gmail App Password (16 chars)
+        },
+        tls: {
+            rejectUnauthorized: true, // Enforce valid TLS certificate
+        },
+        logger: false,
+        debug: false,
+    })
+}
 
 /**
  * Send OTP verification email
@@ -94,6 +94,7 @@ R.A.S.H College App Team
             `.trim(),
         }
 
+        const transporter = createTransporter()
         const info = await transporter.sendMail(mailOptions)
         console.log("OTP email sent successfully:", info.messageId)
         return true
@@ -177,6 +178,7 @@ R.A.S.H College App Team
             `.trim(),
         }
 
+        const transporter = createTransporter()
         const info = await transporter.sendMail(mailOptions)
         console.log("Password reset email sent successfully:", info.messageId)
         return true

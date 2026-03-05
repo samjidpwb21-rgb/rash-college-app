@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from "recharts"
+import dynamic from "next/dynamic"
+const DepartmentAttendanceChart = dynamic(() => import("@/components/dashboard/charts/department-attendance-chart"), { ssr: false })
+const WeeklyTrendChart = dynamic(() => import("@/components/dashboard/charts/weekly-trend-chart"), { ssr: false })
 import { Download, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Clock, Filter, AlertCircle } from "lucide-react"
-import { getDepartmentColor } from "@/lib/chart-colors"
-import { CustomBarTooltip } from "@/lib/custom-bar-tooltip"
 
 interface AttendanceOverviewClientProps {
     stats: {
@@ -69,7 +69,7 @@ export function AttendanceOverviewClient({
             <div className="lg:ml-64">
                 <DashboardHeader title="Attendance Overview" user={user} onMenuClick={() => setSidebarOpen(true)} />
 
-                <main className="p-6 space-y-6">
+                <main className="p-4 sm:p-6 space-y-6">
                     {/* Stats */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                         <Card>
@@ -159,19 +159,7 @@ export function AttendanceOverviewClient({
                                         <CardContent>
                                             {departmentAttendance.length > 0 ? (
                                                 <div className="h-72">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <BarChart data={departmentAttendance}>
-                                                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                            <XAxis dataKey="dept" className="text-xs" />
-                                                            <YAxis className="text-xs" domain={[0, 100]} />
-                                                            <Tooltip content={<CustomBarTooltip colorKey="dept" />} />
-                                                            <Bar dataKey="attendance" radius={[8, 8, 0, 0]} name="Attendance %">
-                                                                {departmentAttendance.map((entry, index) => (
-                                                                    <Cell key={`cell-${index}`} fill={getDepartmentColor(entry.dept)} />
-                                                                ))}
-                                                            </Bar>
-                                                        </BarChart>
-                                                    </ResponsiveContainer>
+                                                    <DepartmentAttendanceChart data={departmentAttendance} />
                                                 </div>
                                             ) : (
                                                 <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -189,28 +177,7 @@ export function AttendanceOverviewClient({
                                         <CardContent>
                                             {weeklyTrend.length > 0 ? (
                                                 <div className="h-72">
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <LineChart data={weeklyTrend}>
-                                                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                            <XAxis dataKey="week" className="text-xs" />
-                                                            <YAxis className="text-xs" domain={[0, 100]} />
-                                                            <Tooltip
-                                                                contentStyle={{
-                                                                    backgroundColor: "hsl(var(--card))",
-                                                                    border: "1px solid hsl(var(--border))",
-                                                                    borderRadius: "8px",
-                                                                }}
-                                                            />
-                                                            <Line
-                                                                type="monotone"
-                                                                dataKey="attendance"
-                                                                stroke="hsl(var(--primary))"
-                                                                strokeWidth={2}
-                                                                dot={{ fill: "hsl(var(--primary))" }}
-                                                                name="Attendance %"
-                                                            />
-                                                        </LineChart>
-                                                    </ResponsiveContainer>
+                                                    <WeeklyTrendChart data={weeklyTrend} />
                                                 </div>
                                             ) : (
                                                 <div className="h-72 flex items-center justify-center text-muted-foreground">
@@ -255,7 +222,7 @@ export function AttendanceOverviewClient({
                                     </CardHeader>
                                     <CardContent>
                                         {recentRecords.length > 0 ? (
-                                            <div className="border rounded-lg overflow-hidden">
+                                            <div className="border rounded-lg overflow-x-auto">
                                                 <table className="w-full">
                                                     <thead className="bg-muted/50">
                                                         <tr>
@@ -329,7 +296,7 @@ export function AttendanceOverviewClient({
                                     </CardHeader>
                                     <CardContent>
                                         {lowAttendanceStudents.length > 0 ? (
-                                            <div className="border rounded-lg overflow-hidden">
+                                            <div className="border rounded-lg overflow-x-auto">
                                                 <table className="w-full">
                                                     <thead className="bg-muted/50">
                                                         <tr>

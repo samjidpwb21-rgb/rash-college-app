@@ -13,18 +13,18 @@
 export function getNoticeCardColor(noticeId: string): string {
     // Predefined palette of darker pastel colors with good contrast
     const colorPalettes = [
-        "bg-blue-100 border-l-4 border-blue-500",
-        "bg-purple-100 border-l-4 border-purple-500",
-        "bg-pink-100 border-l-4 border-pink-500",
-        "bg-green-100 border-l-4 border-green-500",
-        "bg-yellow-100 border-l-4 border-yellow-500",
-        "bg-orange-100 border-l-4 border-orange-500",
-        "bg-teal-100 border-l-4 border-teal-500",
-        "bg-indigo-100 border-l-4 border-indigo-500",
-        "bg-cyan-100 border-l-4 border-cyan-500",
-        "bg-rose-100 border-l-4 border-rose-500",
-        "bg-emerald-100 border-l-4 border-emerald-500",
-        "bg-violet-100 border-l-4 border-violet-500",
+        "bg-blue-100 border-l-4 border-blue-500 text-slate-900 dark:text-slate-900",
+        "bg-purple-100 border-l-4 border-purple-500 text-slate-900 dark:text-slate-900",
+        "bg-pink-100 border-l-4 border-pink-500 text-slate-900 dark:text-slate-900",
+        "bg-green-100 border-l-4 border-green-500 text-slate-900 dark:text-slate-900",
+        "bg-yellow-100 border-l-4 border-yellow-500 text-slate-900 dark:text-slate-900",
+        "bg-orange-100 border-l-4 border-orange-500 text-slate-900 dark:text-slate-900",
+        "bg-teal-100 border-l-4 border-teal-500 text-slate-900 dark:text-slate-900",
+        "bg-indigo-100 border-l-4 border-indigo-500 text-slate-900 dark:text-slate-900",
+        "bg-cyan-100 border-l-4 border-cyan-500 text-slate-900 dark:text-slate-900",
+        "bg-rose-100 border-l-4 border-rose-500 text-slate-900 dark:text-slate-900",
+        "bg-emerald-100 border-l-4 border-emerald-500 text-slate-900 dark:text-slate-900",
+        "bg-violet-100 border-l-4 border-violet-500 text-slate-900 dark:text-slate-900",
     ]
 
     // Simple hash function to convert ID to a number

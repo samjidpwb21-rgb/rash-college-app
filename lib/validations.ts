@@ -88,7 +88,11 @@ export const createNoticeSchema = z.object({
     title: z.string().min(3, "Title must be at least 3 characters").max(200),
     content: z.string().min(10, "Content must be at least 10 characters"),
     isImportant: z.boolean().default(false),
-    expiresAt: z.string().datetime().optional(),
+    expiresAt: z.union([z.string().datetime(), z.literal(""), z.null()]).optional(),
+    imageUrl: z.string().url().or(z.string().startsWith("/")).optional().nullable(),
+    departmentId: z.union([uuidSchema, z.literal(""), z.null()]).optional().transform(e => e === "" ? undefined : e),
+    colorIndex: z.number().int().optional(),
+    type: z.enum(["ACADEMIC", "EVENT", "EXAM", "GENERAL"]).optional(),
 })
 
 export const updateNoticeSchema = z.object({
@@ -96,7 +100,7 @@ export const updateNoticeSchema = z.object({
     title: z.string().min(3).max(200).optional(),
     content: z.string().min(10).optional(),
     isImportant: z.boolean().optional(),
-    expiresAt: z.string().datetime().optional().nullable(),
+    expiresAt: z.union([z.string().datetime(), z.literal(""), z.null()]).optional(),
 })
 
 // ============================================================================

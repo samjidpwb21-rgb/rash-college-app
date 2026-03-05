@@ -27,8 +27,8 @@ export async function getDailyAttendanceStatus(
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        // Fetch regular attendance for today
-        const regularAttendance = await prisma.attendanceRecord.findMany({
+        // Start both queries concurrently
+        const regularAttendancePromise = prisma.attendanceRecord.findMany({
             where: {
                 studentId,
                 date: today,
@@ -42,8 +42,7 @@ export async function getDailyAttendanceStatus(
             },
         })
 
-        // Fetch MDC attendance for today
-        const mdcAttendance = await prisma.mDCAttendanceRecord.findMany({
+        const mdcAttendancePromise = prisma.mDCAttendanceRecord.findMany({
             where: {
                 studentId,
                 date: today,
@@ -56,6 +55,11 @@ export async function getDailyAttendanceStatus(
                 },
             },
         })
+
+        const [regularAttendance, mdcAttendance] = await Promise.all([
+            regularAttendancePromise,
+            mdcAttendancePromise
+        ])
 
         // Create map: period → attendance data
         const attendanceMap = new Map<number, { status: AttendanceStatus; facultyName: string }>()

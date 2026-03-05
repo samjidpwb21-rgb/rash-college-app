@@ -6,7 +6,7 @@
 // Client wrapper for interactive elements (charts, sidebar toggle)
 // Data is passed from server component
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { DashboardSidebar, MobileSidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
@@ -15,11 +15,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import dynamic from "next/dynamic"
+const SubjectAttendanceChart = dynamic(() => import("@/components/dashboard/charts/subject-attendance-chart"), { ssr: false })
+const OverallStatusChart = dynamic(() => import("@/components/dashboard/charts/overall-status-chart"), { ssr: false })
 import { Calendar, ClipboardCheck, Clock, GraduationCap, User, ArrowRight } from "lucide-react"
-import { getSubjectColor } from "@/lib/chart-colors"
-import { CustomBarTooltip } from "@/lib/custom-bar-tooltip"
-import { useLoading } from "@/contexts/loading-context"
 import { DailyAttendanceBar } from "@/components/dashboard/daily-attendance-bar"
 import { DailyAttendanceBlock } from "@/actions/daily-attendance"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
@@ -66,7 +65,6 @@ interface StudentDashboardProps {
 
 export function StudentDashboardClient({ data }: StudentDashboardProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const { forceFinishAll } = useLoading()
 
     const user = {
         name: data.user.name,
@@ -74,11 +72,6 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
         avatar: data.user.avatar,
         role: `${data.user.departmentName} - Semester ${data.user.semesterNumber}`,
     }
-
-    // Force clear any stuck loading states when dashboard mounts
-    useEffect(() => {
-        forceFinishAll()
-    }, [])
 
     // Transform subject attendance for chart
     const attendanceChartData = data.subjectAttendance.map((s) => ({
@@ -153,19 +146,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                             <CardContent>
                                 <div className="h-72">
                                     {attendanceChartData.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={attendanceChartData}>
-                                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                                                <XAxis dataKey="subject" className="text-xs" />
-                                                <YAxis className="text-xs" />
-                                                <Tooltip content={<CustomBarTooltip colorKey="subject" />} />
-                                                <Bar dataKey="present" radius={[8, 8, 0, 0]} name="Present %">
-                                                    {attendanceChartData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={getSubjectColor(entry.subject)} />
-                                                    ))}
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
+                                        <SubjectAttendanceChart data={attendanceChartData} />
                                     ) : (
                                         <div className="flex items-center justify-center h-full text-muted-foreground">
                                             No attendance data yet
@@ -182,24 +163,7 @@ export function StudentDashboardClient({ data }: StudentDashboardProps) {
                             </CardHeader>
                             <CardContent>
                                 <div className="h-52">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={overallAttendance}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {overallAttendance.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip />
-                                        </PieChart>
-                                    </ResponsiveContainer>
+                                    <OverallStatusChart data={overallAttendance} />
                                 </div>
                                 <div className="flex justify-center gap-6 mt-4">
                                     {overallAttendance.map((item) => (
