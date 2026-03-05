@@ -10,6 +10,7 @@ import { requireRole, getSession } from "@/lib/auth"
 import { createNoticeSchema, updateNoticeSchema, uuidSchema } from "@/lib/validations"
 import { ActionResult, successResponse, errorResponse } from "@/types/api"
 import { Notice } from "@prisma/client"
+import { revalidatePath } from "next/cache"
 
 /**
  * Create a new global notice
@@ -116,6 +117,10 @@ export async function createNotice(
             console.error("Notice notification dispatch failed (non-fatal):", notifError)
         }
 
+        revalidatePath("/dashboard/admin/notices")
+        revalidatePath("/dashboard/faculty/notices")
+        revalidatePath("/dashboard/student/notices")
+
         return successResponse(notice, "Notice created successfully")
     } catch (error) {
         console.error("createNotice error:", error)
@@ -165,6 +170,10 @@ export async function updateNotice(
             },
         })
 
+        revalidatePath("/dashboard/admin/notices")
+        revalidatePath("/dashboard/faculty/notices")
+        revalidatePath("/dashboard/student/notices")
+
         return successResponse(notice, "Notice updated successfully")
     } catch (error) {
         if (error instanceof Error && error.message.includes("Unauthorized")) {
@@ -211,6 +220,10 @@ export async function deleteNotice(id: string): Promise<ActionResult<{ id: strin
         await prisma.notice.delete({
             where: { id: validated.data },
         })
+
+        revalidatePath("/dashboard/admin/notices")
+        revalidatePath("/dashboard/faculty/notices")
+        revalidatePath("/dashboard/student/notices")
 
         return successResponse({ id: validated.data }, "Notice deleted successfully")
     } catch (error) {
